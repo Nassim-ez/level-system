@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #05070d;
+  --panel: #0a1120;
+  --line: #1b3a5c;
+  --glow: #3fb6ff;
+  --xp: #8fe0ff;
+  --text: #d7ecff;
+  --dim: #6f8db0;
+  --danger: #ff4d5e;
+  --ok: #4dffa6;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: radial-gradient(
+    ellipse 80% 50% at 50% -10%,
+    rgba(63, 182, 255, 0.1),
+    transparent
+  );
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  min-height: 100svh;
+}
+
+#root {
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: 'Orbitron', sans-serif;
+}
+
+@keyframes rank-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(63, 182, 255, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(63, 182, 255, 0.7);
+  }
+}
