@@ -1,4 +1,4 @@
-function Panel({ title, accent, glow, children }) {
+function Panel({ title, accent, glow, titleColor, children }) {
   return (
     <section
       className="rounded-[18px] border p-4"
@@ -18,7 +18,7 @@ function Panel({ title, accent, glow, children }) {
               fontFamily: "'Orbitron', sans-serif",
               fontSize: '10px',
               letterSpacing: '3px',
-              color: accent ?? 'var(--glow)',
+              color: titleColor ?? accent ?? 'var(--glow)',
               textShadow: accent ? '0 0 8px rgba(143,224,255,.8)' : 'none',
             }}
           >

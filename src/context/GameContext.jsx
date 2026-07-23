@@ -289,6 +289,10 @@ function reducer(state, action) {
         }),
       }
     }
+    case 'RESET_GAME': {
+      localStorage.removeItem(STORAGE_KEY)
+      return { ...initialState }
+    }
     case 'SET_TITLE': {
       if (!state.unlockedTitles.includes(action.id)) return state
       return { ...state, title: TITLES[action.id].name }

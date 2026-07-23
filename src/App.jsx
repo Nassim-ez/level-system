@@ -350,6 +350,10 @@ function App() {
   const [active, setActive] = useState('status')
   const ActivePage = TABS.find((t) => t.id === active).page
 
+  useEffect(() => {
+    if (!state.onboarded) setActive('status')
+  }, [state.onboarded])
+
   if (!state.onboarded) return <Onboarding />
 
   return (
