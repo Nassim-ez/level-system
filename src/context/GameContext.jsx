@@ -43,6 +43,7 @@ const initialState = {
   inventory: ['holzschwert', 'serienschutz'],
   rankTestActive: false,
   klasse: null,
+  gender: null,
   onboarded: false,
   unlockedTitles: ['neuling'],
   lifetime: { liegestuetze: 0, dungeons: 0, bestStreak: 0 },
@@ -279,6 +280,7 @@ function reducer(state, action) {
         ...state,
         onboarded: true,
         name: action.name?.trim() || state.name,
+        gender: action.gender ?? state.gender,
         rank: action.rank,
         level,
         xp: 0,
@@ -296,6 +298,10 @@ function reducer(state, action) {
     case 'SET_TITLE': {
       if (!state.unlockedTitles.includes(action.id)) return state
       return { ...state, title: TITLES[action.id].name }
+    }
+    case 'SET_GENDER': {
+      if (!['m', 'w', 'd'].includes(action.gender)) return state
+      return { ...state, gender: action.gender }
     }
     case 'CHOOSE_CLASS': {
       if (state.klasse || !CLASSES[action.id]) return state

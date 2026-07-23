@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import { todayKey } from '../data/quests.js'
+import { GENDERS } from '../data/gender.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -102,9 +103,88 @@ function ResetConfirmPopup({ onCancel, onConfirm }) {
   )
 }
 
+function GenderPopup({ current, onSelect, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-6"
+      style={{ background: 'rgba(2,4,9,.7)', backdropFilter: 'blur(3px)' }}
+    >
+      <div
+        className="w-full max-w-[340px] rounded-[18px] border p-5 text-center"
+        style={{
+          background: 'var(--panel)',
+          borderColor: 'var(--glow)',
+          boxShadow: '0 0 40px rgba(63,182,255,.3)',
+        }}
+      >
+        <p
+          style={{
+            ...orbitron,
+            fontSize: '10px',
+            letterSpacing: '3px',
+            color: 'var(--glow)',
+          }}
+        >
+          ◆ SYSTEM
+        </p>
+        <p
+          className="mt-3"
+          style={{
+            ...orbitron,
+            fontSize: '18px',
+            color: 'var(--xp)',
+            textShadow: '0 0 14px rgba(143,224,255,.9)',
+          }}
+        >
+          ERSCHEINUNG
+        </p>
+        <p className="mt-2 text-[13px]" style={{ color: 'var(--dim)' }}>
+          Wähle deine Erscheinung
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          {GENDERS.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelect(id)}
+              className="w-full bg-transparent px-4 py-3"
+              style={{
+                ...orbitron,
+                fontSize: '12px',
+                letterSpacing: '2px',
+                color: id === current ? 'var(--xp)' : 'var(--text)',
+                border: `1px solid ${id === current ? 'var(--xp)' : 'var(--line)'}`,
+                borderRadius: '10px',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 bg-transparent px-5 py-2"
+          style={{
+            ...orbitron,
+            fontSize: '11px',
+            letterSpacing: '2px',
+            color: 'var(--dim)',
+            border: '1px solid var(--line)',
+            borderRadius: '10px',
+          }}
+        >
+          SCHLIESSEN
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function Log() {
   const { state, dispatch } = useGame()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [genderOpen, setGenderOpen] = useState(false)
 
   return (
     <div className="flex flex-col gap-4">
@@ -178,6 +258,21 @@ function Log() {
         >
           SYSTEM ZURÜCKSETZEN
         </button>
+        <button
+          type="button"
+          onClick={() => setGenderOpen(true)}
+          className="mt-2 w-full bg-transparent px-4 py-2"
+          style={{
+            ...orbitron,
+            fontSize: '10px',
+            letterSpacing: '2px',
+            color: 'var(--dim)',
+            border: '1px solid var(--line)',
+            borderRadius: '10px',
+          }}
+        >
+          ERSCHEINUNG ÄNDERN
+        </button>
       </Panel>
 
       {confirmOpen && (
@@ -187,6 +282,17 @@ function Log() {
             setConfirmOpen(false)
             dispatch({ type: 'RESET_GAME' })
           }}
+        />
+      )}
+
+      {genderOpen && (
+        <GenderPopup
+          current={state.gender}
+          onSelect={(gender) => {
+            dispatch({ type: 'SET_GENDER', gender })
+            setGenderOpen(false)
+          }}
+          onClose={() => setGenderOpen(false)}
         />
       )}
     </div>

@@ -3,6 +3,7 @@ import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import { CLASSES } from '../data/classes.js'
 import { TITLES } from '../data/titles.js'
+import { anrede } from '../data/gender.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -40,7 +41,7 @@ function Status() {
               className="uppercase"
               style={{ fontSize: '12px', color: 'var(--dim)', letterSpacing: '2px' }}
             >
-              Jäger · Aufsteigend
+              {anrede(state.gender)} · Aufsteigend
             </p>
             <p
               onClick={() => setTitleMenu((v) => !v)}

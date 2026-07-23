@@ -5,21 +5,45 @@ import { ITEMS, SLOT_LABELS, bonusText } from '../data/items.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
-// Slot-Layout: [slot, boxX, boxY, ankerX, ankerY]
+// Slot-Boxen: feste Positionen [slot, boxX, boxY]
 const LEFT_SLOTS = [
-  ['helm', 20, 20, 196, 34],
-  ['umhang', 20, 104, 166, 94],
-  ['ring', 20, 188, 150, 202],
-  ['hose', 20, 272, 188, 218],
+  ['helm', 20, 20],
+  ['umhang', 20, 104],
+  ['ring', 20, 188],
+  ['hose', 20, 272],
 ]
 const RIGHT_SLOTS = [
-  ['kette', 336, 20, 205, 74],
-  ['brust', 336, 104, 214, 126],
-  ['waffe', 336, 188, 250, 202],
-  ['schuhe', 336, 272, 216, 340],
+  ['kette', 336, 20],
+  ['brust', 336, 104],
+  ['waffe', 336, 188],
+  ['schuhe', 336, 272],
 ]
 
-const BODY_PATH = `
+// Ankerpunkte am Körper – pro Figur-Variante angepasst
+const ANCHORS = {
+  m: {
+    helm: [196, 34],
+    umhang: [166, 94],
+    ring: [150, 202],
+    hose: [188, 218],
+    kette: [205, 74],
+    brust: [214, 126],
+    waffe: [250, 202],
+    schuhe: [216, 340],
+  },
+  w: {
+    helm: [196, 34],
+    umhang: [175, 92],
+    ring: [160, 204],
+    hose: [186, 224],
+    kette: [205, 74],
+    brust: [212, 126],
+    waffe: [240, 204],
+    schuhe: [215, 342],
+  },
+}
+
+const BODY_PATH_M = `
   M192 64 L191 76
   C182 80 170 84 163 92
   C155 98 152 108 150 120
@@ -64,6 +88,77 @@ const BODY_PATH = `
   L208 64
   C203 67 197 67 192 64 Z
 `
+
+// Weibliche Variante: schmalere Schultern, schmalere Taille, breitere Hüfte
+const BODY_PATH_W = `
+  M193 64 L192 76
+  C185 80 177 84 172 90
+  C164 97 160 106 158 118
+  C156 138 155 158 154 178
+  L155 198
+  C155 206 158 210 162 208
+  L166 200
+  C168 184 169 158 171 140
+  C172 126 174 116 178 110
+  C181 124 184 138 185 154
+  C186 168 185 182 184 196
+  C183 206 177 216 172 227
+  C165 235 161 242 161 250
+  C162 264 168 276 174 288
+  C179 301 182 314 185 326
+  L186 336
+  C182 340 175 344 171 346
+  C167 348 169 350 173 350
+  L196 350 L197 330
+  C196 314 195 298 194 282
+  C193 270 194 256 197 244
+  C199 234 200 228 200 224
+  C200 228 201 234 203 244
+  C206 256 207 270 206 282
+  C205 298 204 314 203 330
+  L204 350 L227 350
+  C231 350 233 348 229 346
+  C225 344 218 340 214 336
+  L215 326
+  C218 314 221 301 226 288
+  C232 276 238 264 239 250
+  C239 242 235 235 228 227
+  C223 216 217 206 216 196
+  C215 182 214 168 215 154
+  C216 138 219 124 222 110
+  C226 116 228 126 229 140
+  C231 158 232 184 234 200
+  L238 208
+  C242 210 245 206 245 198
+  L246 178
+  C245 158 244 138 242 118
+  C240 106 236 97 228 90
+  C223 84 215 80 208 76
+  L207 64
+  C202 67 198 67 193 64 Z
+`
+
+const ANATOMY_M = [
+  'M181 92 Q200 100 219 92',
+  'M184 118 Q200 127 216 118',
+  'M200 132 L200 192',
+  'M189 152 L211 152',
+  'M190 170 L210 170',
+]
+
+const ANATOMY_W = [
+  'M180 92 Q200 100 220 92',
+  'M186 120 Q200 130 214 120',
+  'M200 130 L200 196',
+  'M191 150 L209 150',
+  'M192 172 L208 172',
+]
+
+const FIGURES = {
+  m: { path: BODY_PATH_M, anatomy: ANATOMY_M, anchors: ANCHORS.m },
+  d: { path: BODY_PATH_M, anatomy: ANATOMY_M, anchors: ANCHORS.m },
+  w: { path: BODY_PATH_W, anatomy: ANATOMY_W, anchors: ANCHORS.w },
+}
 
 function SlotBox({ slot, x, y, equippedId, availableCount, selected, onSelect }) {
   return (
@@ -146,6 +241,7 @@ function CharakterFigur({ state, selected, onSelect }) {
     state.inventory.filter((id) => ITEMS[id]?.slot === slot).length
 
   const allSlots = [...LEFT_SLOTS, ...RIGHT_SLOTS]
+  const fig = FIGURES[state.gender] ?? FIGURES.d
 
   return (
     <svg viewBox="0 0 400 370" className="w-full">
@@ -200,23 +296,29 @@ function CharakterFigur({ state, selected, onSelect }) {
       </circle>
 
       {/* Verbindungslinien Box → Körperteil */}
-      {LEFT_SLOTS.map(([slot, x, y, ax, ay]) => (
-        <g key={slot}>
-          <line x1={x + 44} y1={y + 22} x2={ax} y2={ay} stroke="#1e4a70" strokeWidth="1" />
-          <circle cx={ax} cy={ay} r="2.5" fill="var(--glow)" opacity="0.8" />
-        </g>
-      ))}
-      {RIGHT_SLOTS.map(([slot, x, y, ax, ay]) => (
-        <g key={slot}>
-          <line x1={x} y1={y + 22} x2={ax} y2={ay} stroke="#1e4a70" strokeWidth="1" />
-          <circle cx={ax} cy={ay} r="2.5" fill="var(--glow)" opacity="0.8" />
-        </g>
-      ))}
+      {LEFT_SLOTS.map(([slot, x, y]) => {
+        const [ax, ay] = fig.anchors[slot]
+        return (
+          <g key={slot}>
+            <line x1={x + 44} y1={y + 22} x2={ax} y2={ay} stroke="#1e4a70" strokeWidth="1" />
+            <circle cx={ax} cy={ay} r="2.5" fill="var(--glow)" opacity="0.8" />
+          </g>
+        )
+      })}
+      {RIGHT_SLOTS.map(([slot, x, y]) => {
+        const [ax, ay] = fig.anchors[slot]
+        return (
+          <g key={slot}>
+            <line x1={x} y1={y + 22} x2={ax} y2={ay} stroke="#1e4a70" strokeWidth="1" />
+            <circle cx={ax} cy={ay} r="2.5" fill="var(--glow)" opacity="0.8" />
+          </g>
+        )
+      })}
 
       {/* Weicher Glow unter der Figur */}
       <g filter="url(#figGlow)" opacity="0.6">
         <ellipse cx="200" cy="42" rx="15" ry="19" fill="rgba(63,182,255,.5)" />
-        <path d={BODY_PATH} fill="rgba(63,182,255,.5)" />
+        <path d={fig.path} fill="rgba(63,182,255,.5)" />
       </g>
 
       {/* Hologramm-Silhouette */}
@@ -231,18 +333,16 @@ function CharakterFigur({ state, selected, onSelect }) {
           strokeWidth="1"
         />
         <path
-          d={BODY_PATH}
+          d={fig.path}
           fill="url(#bodyGrad)"
           stroke="rgba(63,182,255,.6)"
           strokeWidth="1"
         />
         {/* Anatomie-Linien */}
         <g fill="none" stroke="rgba(63,182,255,.35)" strokeWidth="1">
-          <path d="M181 92 Q200 100 219 92" />
-          <path d="M184 118 Q200 127 216 118" />
-          <path d="M200 132 L200 192" />
-          <path d="M189 152 L211 152" />
-          <path d="M190 170 L210 170" />
+          {fig.anatomy.map((d) => (
+            <path key={d} d={d} />
+          ))}
         </g>
         {/* Scanlinie */}
         <rect x="142" width="116" height="2" fill="var(--glow)" opacity="0.45">

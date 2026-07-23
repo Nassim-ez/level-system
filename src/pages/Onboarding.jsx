@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGame } from '../context/GameContext.jsx'
+import { GENDERS, anrede } from '../data/gender.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -29,10 +30,13 @@ function Onboarding() {
   const { dispatch } = useGame()
   const [step, setStep] = useState(0)
   const [name, setName] = useState('')
+  const [gender, setGender] = useState(null)
   const [answers, setAnswers] = useState([])
 
   const score = answers.reduce((sum, a) => sum + a, 0)
   const rank = rankFromScore(score)
+  const firstQuestion = 2
+  const resultStep = QUESTIONS.length + firstQuestion
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center px-6 py-10">
@@ -59,7 +63,9 @@ function Onboarding() {
           >
             SYSTEM-INITIALISIERUNG
           </p>
-          <p className="mt-3 text-[15px]">Wie lautet dein Name, Jäger?</p>
+          <p className="mt-3 text-[15px]">
+            Wie lautet dein Name, {anrede(gender)}?
+          </p>
           <input
             type="text"
             value={name}
@@ -93,7 +99,48 @@ function Onboarding() {
         </div>
       )}
 
-      {step >= 1 && step <= QUESTIONS.length && (
+      {step === 1 && (
+        <div className="mt-4 w-full max-w-[340px] text-center">
+          <p
+            style={{
+              ...orbitron,
+              fontSize: '18px',
+              color: 'var(--xp)',
+              textShadow: '0 0 14px rgba(143,224,255,.9)',
+            }}
+          >
+            IDENTIFIKATION
+          </p>
+          <p className="mt-3 text-[15px]">Wähle deine Erscheinung</p>
+          <div className="mt-4 flex flex-col gap-2">
+            {GENDERS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setGender(id)
+                  setStep(firstQuestion)
+                }}
+                className="w-full bg-transparent px-4 py-3"
+                style={{
+                  ...orbitron,
+                  fontSize: '13px',
+                  letterSpacing: '2px',
+                  color: 'var(--text)',
+                  background: 'var(--panel)',
+                  border: '1px solid var(--line)',
+                  borderRadius: '12px',
+                  boxShadow: '0 0 12px rgba(63,182,255,.08)',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step >= firstQuestion && step < resultStep && (
         <div className="mt-4 w-full max-w-[340px] text-center">
           <p
             style={{
@@ -109,11 +156,13 @@ function Onboarding() {
             className="mt-1"
             style={{ ...orbitron, fontSize: '10px', color: 'var(--dim)', letterSpacing: '2px' }}
           >
-            FRAGE {step} / {QUESTIONS.length}
+            FRAGE {step - firstQuestion + 1} / {QUESTIONS.length}
           </p>
-          <p className="mt-3 text-[15px]">{QUESTIONS[step - 1].frage}</p>
+          <p className="mt-3 text-[15px]">
+            {QUESTIONS[step - firstQuestion].frage}
+          </p>
           <div className="mt-4 flex flex-col gap-2">
-            {QUESTIONS[step - 1].optionen.map((option, index) => (
+            {QUESTIONS[step - firstQuestion].optionen.map((option, index) => (
               <button
                 key={option}
                 type="button"
@@ -138,7 +187,7 @@ function Onboarding() {
         </div>
       )}
 
-      {step === QUESTIONS.length + 1 && (
+      {step === resultStep && (
         <div className="mt-4 w-full max-w-[340px] text-center">
           <p
             style={{
@@ -178,7 +227,7 @@ function Onboarding() {
           <button
             type="button"
             onClick={() =>
-              dispatch({ type: 'COMPLETE_ONBOARDING', name, rank })
+              dispatch({ type: 'COMPLETE_ONBOARDING', name, gender, rank })
             }
             className="mt-6 bg-transparent px-6 py-3"
             style={{
