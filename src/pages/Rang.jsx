@@ -1,6 +1,7 @@
 import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
-import { RANKS, RANK_THRESHOLDS, nextRank } from '../data/ranks.js'
+import { RANKS, RANK_THRESHOLDS, buildRankTest, nextRank } from '../data/ranks.js'
+import { QUESTS, needsNegatives } from '../data/quests.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -9,6 +10,18 @@ function Rang() {
   const currentIndex = RANKS.indexOf(state.rank)
   const next = nextRank(state.rank)
   const levelsLeft = next ? RANK_THRESHOLDS[next] - state.level : 0
+
+  // Prüfungsziele: aktiv = eingefroren, sonst Vorschau aus aktuellen Zielen
+  const tasks = next
+    ? (state.rankTestActive && state.rankTestTasks) ||
+      buildRankTest(state.rank, state.baseTargets, needsNegatives(state))
+    : null
+  const zielText = tasks
+    ?.map((t) => {
+      const q = t.negativ ? QUESTS.negativklimmzuege : QUESTS[t.quest]
+      return `${t.ziel} ${q.name}`
+    })
+    .join(' + ')
 
   return (
     <Panel title="RANG">
@@ -96,6 +109,12 @@ function Rang() {
           {state.rankTestActive
             ? 'Aufstiegsprüfung verfügbar – siehe Quests!'
             : `Noch ${levelsLeft} Level bis zur Aufstiegsprüfung`}
+        </p>
+      )}
+      {next && zielText && (
+        <p className="mt-1" style={{ fontSize: '12px', color: 'var(--dim)' }}>
+          {state.rankTestActive ? 'Dein Prüfungsziel' : 'Voraussichtlich'}:{' '}
+          <span style={{ color: 'var(--xp)' }}>{zielText}</span> an einem Tag
         </p>
       )}
       <p className="mt-1" style={{ fontSize: '12px', color: 'var(--dim)' }}>

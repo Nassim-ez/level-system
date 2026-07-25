@@ -11,8 +11,9 @@ import {
   STEP_XP_PER_1000,
   stepXpMax,
   resolveQuest,
+  needsNegatives,
 } from '../data/quests.js'
-import { RANK_TESTS, nextRank } from '../data/ranks.js'
+import { RANK_TESTS, buildRankTest, nextRank } from '../data/ranks.js'
 import { DUNGEONS, DUNGEON_XP, DUNGEON_EXERCISES } from '../data/dungeons.js'
 import { ITEMS } from '../data/items.js'
 
@@ -102,6 +103,10 @@ function Quests() {
   }
 
   const test = state.rankTestActive ? RANK_TESTS[state.rank] : null
+  const rankTasks = state.rankTestActive
+    ? (state.rankTestTasks ??
+      buildRankTest(state.rank, state.baseTargets, needsNegatives(state)))
+    : null
   const rankProgress = questProgress.rankTest ?? {}
 
   return (
@@ -115,12 +120,23 @@ function Quests() {
             RANG {state.rank} → {nextRank(state.rank)}
           </p>
           <p className="mb-3" style={{ fontSize: '13px', color: 'var(--dim)' }}>
-            {test.beschreibung}
+            {rankTasks
+              .map((t) => {
+                const q = t.negativ ? QUESTS.negativklimmzuege : QUESTS[t.quest]
+                return `${t.ziel} ${q.name}`
+              })
+              .join(' + ')}{' '}
+            an einem Tag
           </p>
           <div className="flex flex-col gap-2">
-            {test.tasks.map((task) => {
-              const q = QUESTS[task.quest]
+            {rankTasks.map((task) => {
+              const q = task.negativ
+                ? QUESTS.negativklimmzuege
+                : QUESTS[task.quest]
               const value = rankProgress[task.quest] ?? 0
+              const tagesziel = task.negativ
+                ? QUESTS.negativklimmzuege.festesZiel
+                : state.baseTargets?.[task.quest]
               return (
                 <div
                   key={task.quest}
@@ -129,6 +145,9 @@ function Quests() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-[16px] font-semibold">{q.name}</p>
+                    <p style={{ fontSize: '11px', color: 'var(--dim)' }}>
+                      Prüfungsziel: {task.ziel} · dein Tagesziel: {tagesziel}
+                    </p>
                     <div
                       className="mt-1 h-[6px] w-full overflow-hidden rounded-full"
                       style={{ background: '#0f1a2e' }}

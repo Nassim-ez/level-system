@@ -5,12 +5,17 @@ import {
   todayKey,
   POOL_XP,
   raiseTargets,
-  resolveQuest,
+  needsNegatives,
 } from '../data/quests.js'
 import { CLASSES } from '../data/classes.js'
 import { TITLES } from '../data/titles.js'
 import { ITEMS } from '../data/items.js'
-import { RANK_THRESHOLDS, RANK_TESTS, nextRank } from '../data/ranks.js'
+import {
+  RANK_THRESHOLDS,
+  RANK_TESTS,
+  buildRankTest,
+  nextRank,
+} from '../data/ranks.js'
 import { DUNGEONS, DUNGEON_XP } from '../data/dungeons.js'
 
 const STORAGE_KEY = 'system_save'
@@ -43,6 +48,7 @@ const initialState = {
   },
   inventory: ['holzschwert', 'serienschutz'],
   rankTestActive: false,
+  rankTestTasks: null, // beim Freischalten eingefrorene Prüfungsziele
   klasse: null,
   gender: null,
   onboarded: false,
@@ -124,14 +130,30 @@ function reducer(state, action) {
         })
       }
       let rankTestActive = state.rankTestActive
+      let rankTestTasks = state.rankTestTasks
       const next = nextRank(state.rank)
       if (next && level >= RANK_THRESHOLDS[next] && !rankTestActive) {
         rankTestActive = true
+        // Ziele einmalig einfrieren, damit spätere Boni sie nicht verschieben
+        rankTestTasks = buildRankTest(
+          state.rank,
+          state.baseTargets,
+          needsNegatives(state),
+        )
         log = withLog(log, 'Aufstiegsprüfung freigeschaltet', {
           detail: `Rang ${state.rank} → ${next}`,
         })
       }
-      return { ...state, xp, level, xpGoal, points, rankTestActive, log }
+      return {
+        ...state,
+        xp,
+        level,
+        xpGoal,
+        points,
+        rankTestActive,
+        rankTestTasks,
+        log,
+      }
     }
     case 'SPEND_POINT': {
       if (state.points <= 0) return state
@@ -381,23 +403,28 @@ function reducer(state, action) {
     case 'RANK_TASK_PROGRESS': {
       if (!state.rankTestActive) return state
       const test = RANK_TESTS[state.rank]
-      const task = test?.tasks.find((t) => t.quest === action.taskId)
+      const tasks =
+        state.rankTestTasks ??
+        buildRankTest(state.rank, state.baseTargets, needsNegatives(state))
+      const task = tasks?.find((t) => t.quest === action.taskId)
       if (!task) return state
       const prev = state.questProgress.rankTest ?? {}
       const value = Math.min((prev[action.taskId] ?? 0) + action.amount, task.ziel)
       const rankTest = { ...prev, [action.taskId]: value }
       let lifetime = state.lifetime
       const added = value - (prev[action.taskId] ?? 0)
+      // Negativ-Klimmzüge zählen nicht als echte Klimmzüge
       if (
-        (action.taskId === 'liegestuetze' || action.taskId === 'klimmzuege') &&
-        added > 0
+        added > 0 &&
+        (action.taskId === 'liegestuetze' ||
+          (action.taskId === 'klimmzuege' && !task.negativ))
       ) {
         lifetime = {
           ...lifetime,
           [action.taskId]: (lifetime[action.taskId] ?? 0) + added,
         }
       }
-      const passed = test.tasks.every((t) => (rankTest[t.quest] ?? 0) >= t.ziel)
+      const passed = tasks.every((t) => (rankTest[t.quest] ?? 0) >= t.ziel)
       if (!passed) {
         return {
           ...state,
@@ -417,10 +444,15 @@ function reducer(state, action) {
       log = withLog(log, `${ITEMS[test.reward].name} erhalten`, {
         detail: 'Belohnung',
       })
+      const zwischenstand = { ...state, lifetime, baseTargets }
       return {
         ...state,
         rank: newRank,
         rankTestActive: stillActive,
+        // Folgt direkt die nächste Prüfung, deren Ziele neu einfrieren
+        rankTestTasks: stillActive
+          ? buildRankTest(newRank, baseTargets, needsNegatives(zwischenstand))
+          : null,
         lifetime,
         baseTargets,
         inventory: [...state.inventory, test.reward],
