@@ -18,7 +18,7 @@ import {
   buildRankTest,
   nextRank,
 } from '../data/ranks.js'
-import { DUNGEONS, DUNGEON_XP } from '../data/dungeons.js'
+import { DUNGEONS, DUNGEON_XP, findDungeon, doorHp } from '../data/dungeons.js'
 
 const STORAGE_KEY = 'system_save'
 
@@ -351,11 +351,139 @@ function reducer(state, action) {
       return { ...state, title: TITLES[action.id].name }
     }
     case 'DUNGEON_DEATH': {
+      // Niederlage: Aura erlischt, Fortschritt verfällt, Tor öffnet sich
+      const dungeon = findDungeon(state.dungeon.run)
+      let log = withLog(state.log, 'Deine Aura ist erloschen', {
+        detail: 'Im Dungeon gefallen',
+      })
+      if (dungeon) {
+        log = withLog(log, `${dungeon.name} gescheitert`, {
+          detail: 'Fortschritt verloren',
+        })
+      }
       return {
         ...state,
         aura: 0,
-        log: withLog(state.log, 'Deine Aura ist erloschen', {
-          detail: 'Im Dungeon gefallen',
+        dungeon: {
+          ...state.dungeon,
+          run: null,
+          door: 0,
+          progress: {},
+          inside: false,
+          enemyHp: null,
+          killed: 0,
+        },
+        log,
+      }
+    }
+    case 'DUNGEON_SELECT': {
+      // Dungeon auswählen (Türkarte ansehen) – nur außerhalb eines Laufs
+      if (state.dungeon.inside) return state
+      const dungeon = findDungeon(action.runId)
+      if (!dungeon || dungeon.rank !== state.rank) return state
+      return {
+        ...state,
+        dungeon: { ...state.dungeon, run: action.runId, door: 0, progress: {} },
+      }
+    }
+    case 'DUNGEON_BACK': {
+      // Zurück zur Auswahl – nur solange das Tor offen ist
+      if (state.dungeon.inside) return state
+      return { ...state, dungeon: { ...state.dungeon, run: null, door: 0 } }
+    }
+    case 'DUNGEON_OPEN_DOOR': {
+      const dungeon = findDungeon(state.dungeon.run)
+      const tuer = dungeon?.tueren.find((t) => t.nr === action.nr)
+      if (!tuer) return state
+      // Nur die nächste offene Tür ist betretbar
+      const naechste = dungeon.tueren.find((t) => !state.dungeon.progress[t.nr])
+      if (naechste?.nr !== action.nr) return state
+      const zuerst = !state.dungeon.inside
+      let log = state.log
+      if (zuerst) {
+        log = withLog(log, `${dungeon.name} betreten`, {
+          detail: 'Das Tor hat sich geschlossen',
+        })
+      }
+      return {
+        ...state,
+        dungeon: {
+          ...state.dungeon,
+          inside: true,
+          door: action.nr,
+          enemyHp: doorHp(tuer),
+        },
+        log,
+      }
+    }
+    case 'DUNGEON_CLEAR_DOOR': {
+      const dungeon = findDungeon(state.dungeon.run)
+      const tuer = dungeon?.tueren.find((t) => t.nr === state.dungeon.door)
+      if (!tuer || !state.dungeon.inside) return state
+      const progress = { ...state.dungeon.progress, [tuer.nr]: true }
+      const killed = state.dungeon.killed + tuer.anzahl
+      if (!tuer.boss) {
+        return {
+          ...state,
+          dungeon: {
+            ...state.dungeon,
+            progress,
+            killed,
+            door: 0,
+            enemyHp: null,
+          },
+          log: withLog(state.log, `Tür ${tuer.nr} geschafft`, {
+            detail: `${tuer.name} · ${tuer.anzahl}× ${tuer.gegnerart}`,
+          }),
+        }
+      }
+      // Bosssieg: Tor öffnet sich, Beute und XP
+      let log = withLog(state.log, `${dungeon.boss} besiegt`, {
+        detail: `${dungeon.name} abgeschlossen`,
+        xp: DUNGEON_XP,
+      })
+      log = withLog(log, `${ITEMS[dungeon.drop].name} erhalten`, {
+        detail: 'Dungeon-Beute',
+      })
+      let next = {
+        ...state,
+        dungeon: {
+          ...state.dungeon,
+          run: null,
+          door: 0,
+          progress: {},
+          inside: false,
+          enemyHp: null,
+          killed: 0,
+        },
+        inventory: [...state.inventory, dungeon.drop],
+        lifetime: {
+          ...state.lifetime,
+          dungeons: (state.lifetime.dungeons ?? 0) + 1,
+        },
+        log,
+      }
+      next = reducer(next, { type: 'ADD_XP', amount: DUNGEON_XP })
+      return next
+    }
+    case 'DUNGEON_RETURN_STONE': {
+      // Rückkehrstein: raus ohne Beute, Fortschritt verfällt, XP bleiben
+      if (!state.dungeon.inside || state.dungeon.stones <= 0) return state
+      const dungeon = findDungeon(state.dungeon.run)
+      return {
+        ...state,
+        dungeon: {
+          ...state.dungeon,
+          stones: state.dungeon.stones - 1,
+          run: null,
+          door: 0,
+          progress: {},
+          inside: false,
+          enemyHp: null,
+          killed: 0,
+        },
+        log: withLog(state.log, 'Rückkehrstein benutzt', {
+          detail: `${dungeon?.name ?? 'Dungeon'} verlassen · kein Drop`,
         }),
       }
     }

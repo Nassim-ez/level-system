@@ -9,6 +9,7 @@ import Status from './pages/Status.jsx'
 import Quests from './pages/Quests.jsx'
 import Charakter from './pages/Charakter.jsx'
 import Rang from './pages/Rang.jsx'
+import Dungeon from './pages/Dungeon.jsx'
 import Log from './pages/Log.jsx'
 
 const iconProps = {
@@ -53,6 +54,14 @@ const TriangleIcon = () => (
   </svg>
 )
 
+const PortalIcon = () => (
+  <svg {...iconProps}>
+    <path d="M5 21V10a7 7 0 0 1 14 0v11" />
+    <path d="M3 21h18" />
+    <path d="M10 21v-9a2 2 0 0 1 4 0v9" />
+  </svg>
+)
+
 const ListIcon = () => (
   <svg {...iconProps}>
     <path d="M9 6h11M9 12h11M9 18h11" />
@@ -65,6 +74,7 @@ const TABS = [
   { id: 'quests', label: 'QUESTS', icon: SwordsIcon, page: Quests },
   { id: 'char', label: 'CHAR', icon: PersonIcon, page: Charakter },
   { id: 'rang', label: 'RANG', icon: TriangleIcon, page: Rang },
+  { id: 'dungeon', label: 'DUNGEON', icon: PortalIcon, page: Dungeon },
   { id: 'log', label: 'LOG', icon: ListIcon, page: Log },
 ]
 
@@ -379,7 +389,7 @@ function App() {
               key={tab.id}
               type="button"
               onClick={() => setActive(tab.id)}
-              className="flex flex-col items-center gap-1 bg-transparent px-2 py-1"
+              className="flex flex-1 flex-col items-center gap-1 bg-transparent px-1 py-1"
               style={{
                 color: isActive ? 'var(--glow)' : 'var(--dim)',
                 textShadow: isActive ? '0 0 8px rgba(63,182,255,.8)' : 'none',
@@ -389,7 +399,8 @@ function App() {
               <span
                 style={{
                   fontFamily: "'Orbitron', sans-serif",
-                  fontSize: '11px',
+                  fontSize: '9px',
+                  letterSpacing: '0.5px',
                 }}
               >
                 {tab.label}
