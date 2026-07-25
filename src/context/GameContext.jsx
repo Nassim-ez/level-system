@@ -10,6 +10,7 @@ import {
 import { CLASSES } from '../data/classes.js'
 import { TITLES } from '../data/titles.js'
 import { normalizeGender } from '../data/gender.js'
+import { auraGain } from '../data/aura.js'
 import { ITEMS } from '../data/items.js'
 import {
   RANK_THRESHOLDS,
@@ -50,6 +51,16 @@ const initialState = {
   inventory: ['holzschwert', 'serienschutz'],
   rankTestActive: false,
   rankTestTasks: null, // beim Freischalten eingefrorene Prüfungsziele
+  aura: 0,
+  dungeon: {
+    run: null,
+    door: 0,
+    progress: {},
+    inside: false,
+    enemyHp: null,
+    killed: 0,
+    stones: 1,
+  },
   klasse: null,
   gender: null,
   onboarded: false,
@@ -112,22 +123,29 @@ function rootReducer(state, action) {
 function reducer(state, action) {
   switch (action.type) {
     case 'ADD_XP': {
-      let { xp, level, xpGoal, points } = state
+      let { xp, level, xpGoal, points, aura } = state
       let log = state.log
       let amount = action.amount
       if (amount > 0) {
         amount = Math.round(amount * xpMultiplier(state, action.stat))
       }
       xp += amount
+      let auraGewinn = 0
       while (xp >= xpGoal) {
         xp -= xpGoal
         level += 1
         xpGoal = Math.round(xpGoal * 1.25)
         points += 3
+        // Aura-Gewinn pro Level-Up = das erreichte Level
+        auraGewinn += auraGain(level)
       }
       if (level > state.level) {
+        aura += auraGewinn
         log = withLog(log, `Level ${level} erreicht`, {
           detail: `+${(level - state.level) * 3} Punkte`,
+        })
+        log = withLog(log, `Aura +${auraGewinn}`, {
+          detail: `Aura gesamt: ${aura}`,
         })
       }
       let rankTestActive = state.rankTestActive
@@ -151,6 +169,7 @@ function reducer(state, action) {
         level,
         xpGoal,
         points,
+        aura,
         rankTestActive,
         rankTestTasks,
         log,
@@ -330,6 +349,15 @@ function reducer(state, action) {
     case 'SET_TITLE': {
       if (!state.unlockedTitles.includes(action.id)) return state
       return { ...state, title: TITLES[action.id].name }
+    }
+    case 'DUNGEON_DEATH': {
+      return {
+        ...state,
+        aura: 0,
+        log: withLog(state.log, 'Deine Aura ist erloschen', {
+          detail: 'Im Dungeon gefallen',
+        }),
+      }
     }
     case 'SET_GENDER': {
       if (!['m', 'w'].includes(action.gender)) return state

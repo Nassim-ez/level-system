@@ -4,6 +4,7 @@ import { useGame } from '../context/GameContext.jsx'
 import { CLASSES } from '../data/classes.js'
 import { TITLES } from '../data/titles.js'
 import { anrede } from '../data/gender.js'
+import { auraQuote, auraStage } from '../data/aura.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -80,6 +81,24 @@ function Status() {
                 Klasse: {CLASSES[state.klasse]?.name}
               </p>
             )}
+            <p style={{ fontSize: '11px', color: 'var(--dim)' }}>
+              Aura: <span style={{ color: 'var(--xp)' }}>{state.aura}</span> ·{' '}
+              {auraStage(state.aura, level).name}
+            </p>
+            <div
+              className="mt-1 h-[4px] w-[120px] overflow-hidden rounded-full"
+              style={{ background: '#0f1a2e' }}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${auraQuote(state.aura, level) * 100}%`,
+                  background: 'var(--xp)',
+                  boxShadow: '0 0 8px rgba(143,224,255,.7)',
+                  transition: 'width .4s',
+                }}
+              />
+            </div>
             <p style={{ ...orbitron, fontSize: '13px', color: 'var(--xp)' }}>
               LEVEL {level}
             </p>
