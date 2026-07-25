@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../context/GameContext.jsx'
 import FightSprite from '../components/FightSprites.jsx'
-import { findDungeon, spriteFor } from '../data/dungeons.js'
+import { findDungeon } from '../data/dungeons.js'
 import { ITEMS, STUFEN_INFO, MATERIALIEN } from '../data/items.js'
 import { zieheDrops } from '../data/loot.js'
 import { auraDamageBonus, auraStage } from '../data/aura.js'
@@ -10,15 +10,19 @@ import {
   ARTEN,
   MAX_VITALITAET,
   MAX_HEILUNGEN,
-  HEILUNG_PRO_STUFE,
+  HEILUNG_ANTEIL,
   BELASTUNG_LABELS,
-  BELASTUNG_VIERTEL,
+  BELASTUNG_BLOCK,
+  BELASTUNG_HEILEN,
   belastungsStufe,
   blockChance,
   berechneSchaden,
   gegnerSchaden,
-  bossPhase,
-  FLUCH_HEILUNG,
+  moodIndex,
+  MOODS,
+  COMBO_MAX,
+  FLUCH_CHANCE,
+  FLUCH_DAUER,
 } from '../data/combat.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
@@ -31,24 +35,29 @@ function neuerKampf(tuer) {
     heilungen: MAX_HEILUNGEN,
     enemyHp: tuer.hp,
     enemyMaxHp: tuer.hp,
-    enemyIndex: 0, // wievielter Gegner der Gruppe
+    lebende: tuer.anzahl,
     zug: 0,
-    naechsterAngriff: tuer.intervall,
-    phase: 0,
-    fluch: false,
-    blockBereit: false,
-    log: [`${tuer.anzahl}× ${tuer.gegnerart} stellen sich dir entgegen.`],
+    // 'offen' = kein Block, 'gehalten' = Block steht, 'gebrochen' = Block versagt
+    block: 'offen',
+    letzteArt: '',
+    combo: 1,
+    fluch: 0,
+    log: [],
   }
 }
 
-function Leiste({ wert, max, farbe, glow, hoehe = 8 }) {
+function Leiste({ wert, max, farbe, glow, hoehe = 9, mine }) {
   return (
     <div
-      className="w-full overflow-hidden rounded-full border"
-      style={{ height: hoehe, background: '#0f1a2e', borderColor: 'var(--line)' }}
+      className="w-[88%] overflow-hidden rounded-lg border"
+      style={{
+        height: hoehe,
+        background: '#140c12',
+        borderColor: mine ? '#1b4a38' : '#3a1a22',
+      }}
     >
       <div
-        className="h-full rounded-full"
+        className="h-full"
         style={{
           width: `${Math.max(0, Math.min(100, (wert / max) * 100))}%`,
           background: farbe,
@@ -68,13 +77,17 @@ function DungeonFight({ onExit }) {
   const [k, setK] = useState(
     () => state.dungeon.fight ?? (tuer ? neuerKampf(tuer) : null),
   )
-  const [anim, setAnim] = useState({ player: '', enemy: '' })
+  const [pAnim, setPAnim] = useState('')
+  const [eAnim, setEAnim] = useState('')
+  const [shake, setShake] = useState(false)
+  const [slam, setSlam] = useState(false)
+  const [roar, setRoar] = useState(null)
+  const [flies, setFlies] = useState([])
   const [popup, setPopup] = useState(null)
   const [info, setInfo] = useState(false)
-  const [floater, setFloater] = useState(null)
   const timers = useRef([])
+  const merkFlag = useRef(false)
 
-  // Nach jedem Zug speichern
   useEffect(() => {
     if (k) dispatch({ type: 'DUNGEON_FIGHT_SYNC', fight: k })
   }, [k, dispatch])
@@ -88,6 +101,9 @@ function DungeonFight({ onExit }) {
         vitalitaet: MAX_VITALITAET,
         belastung: 0,
         heilungen: MAX_HEILUNGEN,
+        block: 'offen',
+        zug: 0,
+        fluch: 0,
         log: ['Du hast gerastet. Der Gegner hat sich erholt.'],
       }))
     }
@@ -95,7 +111,6 @@ function DungeonFight({ onExit }) {
 
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
 
-  // Während des Kampfes scrollt nichts im Hintergrund
   useEffect(() => {
     const vorher = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -104,6 +119,13 @@ function DungeonFight({ onExit }) {
     }
   }, [])
 
+  // Torschluss-Einblendung beim ersten Betreten
+  useEffect(() => {
+    if (!merkFlag.current && state.dungeon.inside && (k?.zug ?? 0) === 0) {
+      merkFlag.current = true
+    }
+  }, [state.dungeon.inside, k?.zug])
+
   if (!dungeon || !tuer || !k) return null
 
   const auraBonus = auraDamageBonus(
@@ -111,145 +133,140 @@ function DungeonFight({ onExit }) {
     state.level,
     state.rank,
     dungeon.rank,
-    !!tuer.boss,
   )
   const stufe = belastungsStufe(k.belastung)
-  const gegnerRest = tuer.anzahl - k.enemyIndex
-  // Sofort sperren, sobald der Kampf entschieden ist – das Popup folgt verzögert
   const kampfVorbei = !!popup || !!k.beendet
+  const auraStufe = auraStage(state.aura, state.level)
+  const mi = moodIndex(k.enemyHp, k.enemyMaxHp)
 
-  const merke = (text, kk) => [text, ...(kk.log ?? [])].slice(0, 2)
+  const nachricht = (text, art, kk) => [{ text, art }, ...(kk.log ?? [])].slice(0, 2)
 
-  const zeigeFloater = (text, farbe, seite) => {
-    setFloater({ text, farbe, seite, id: Date.now() })
-    timers.current.push(setTimeout(() => setFloater(null), 1000))
+  const fliegen = (text, klasse, rechts) => {
+    const id = Date.now() + Math.random()
+    setFlies((f) => [...f, { id, text, klasse, rechts }])
+    timers.current.push(setTimeout(() => setFlies((f) => f.filter((x) => x.id !== id)), 1000))
   }
-
-  const animiere = (wer, klasse) => {
-    setAnim((a) => ({ ...a, [wer]: klasse }))
-    timers.current.push(
-      setTimeout(() => setAnim((a) => ({ ...a, [wer]: '' })), 500),
-    )
+  const ruettel = () => {
+    setShake(true)
+    timers.current.push(setTimeout(() => setShake(false), 300))
+  }
+  const anim = (wer, klasse, ms) => {
+    const setter = wer === 'p' ? setPAnim : setEAnim
+    setter(klasse)
+    timers.current.push(setTimeout(() => setter(''), ms))
   }
 
   // --- Gegnerzug ---------------------------------------------------------
-  function gegnerZug(kk, blockArt) {
+  function gegnerAngriff(kk) {
     let neu = { ...kk }
-    const dmg = gegnerSchaden({
-      gegner: tuer,
-      welcher: neu.enemyIndex,
-      phase: neu.phase,
-      geblockt: blockArt,
-    })
-    if (blockArt === 'voll') {
-      neu.log = merke(`Plank hält! ${tuer.angriffsname} abgewehrt.`, neu)
-    } else {
-      neu.vitalitaet = Math.max(0, neu.vitalitaet - dmg)
-      animiere('player', 'fight-hit')
-      zeigeFloater(`−${dmg}`, 'var(--danger)', 'links')
-      neu.log = merke(
-        blockArt === 'teilweise'
-          ? `Block misslungen – ${tuer.angriffsname} trifft für ${dmg}.`
-          : `${tuer.gegnerart} nutzt ${tuer.angriffsname}: ${dmg} Schaden.`,
+    anim('e', 'lunge', 500)
+    anim('p', 'hurt', 350)
+    ruettel()
+    setSlam(true)
+    timers.current.push(setTimeout(() => setSlam(false), 600))
+
+    const block = neu.block === 'offen' ? null : neu.block
+    const dmg = gegnerSchaden({ gegner: tuer, lebende: neu.lebende, block })
+    neu.vitalitaet = Math.max(0, neu.vitalitaet - dmg)
+    fliegen(`-${dmg}`, '', false)
+
+    const zusatz =
+      block === 'gehalten'
+        ? ' – geblockt!'
+        : block === 'gebrochen'
+          ? ' – dein Block bricht!'
+          : ''
+    neu.log = nachricht(
+      `${tuer.gegnerart} setzt ${tuer.angriffsname} ein: −${dmg} Vitalität${zusatz}`,
+      'bad',
+      neu,
+    )
+    neu.block = 'offen'
+
+    // Bosse belegen dich gelegentlich mit einem Fluch
+    if (tuer.boss && Math.random() < FLUCH_CHANCE && neu.vitalitaet > 0) {
+      neu.fluch = FLUCH_DAUER
+      neu.log = nachricht(
+        'Ein Fluch legt sich auf deine Arme: −30% Schaden.',
+        'bad',
         neu,
       )
     }
-    animiere('enemy', 'fight-attack-left')
-    neu.naechsterAngriff = tuer.intervall
-    neu.blockBereit = false
     if (neu.vitalitaet <= 0) {
       neu.beendet = 'niederlage'
-      niederlage()
+      timers.current.push(setTimeout(() => setPopup({ art: 'niederlage' }), 700))
     }
     return neu
   }
 
-  function niederlage() {
-    timers.current.push(
-      setTimeout(() => setPopup({ art: 'niederlage' }), 500),
-    )
+  // Zugzähler: kündigt an bzw. löst den Gegnerangriff aus
+  function zugEnde(kk) {
+    let neu = { ...kk, zug: kk.zug + 1 }
+    if (neu.zug % tuer.intervall === 0) return gegnerAngriff(neu)
+    return neu
   }
 
   // --- Spielerzug --------------------------------------------------------
-  function angreifen(angriff) {
+  function angreifen(a) {
     if (kampfVorbei) return
     setK((kk) => {
       let neu = { ...kk }
-      const dmg = berechneSchaden({
-        angriff,
+
+      // Combo-Gegner: Übungswechsel steigert, Wiederholung bricht
+      if (tuer.combo) {
+        if (neu.letzteArt && neu.letzteArt !== a.art) {
+          neu.combo = Math.min(COMBO_MAX, neu.combo + 1)
+        } else if (neu.letzteArt === a.art) {
+          if (neu.combo > 1) {
+            neu.log = nachricht('Er hat sich angepasst – Combo gebrochen.', 'bad', neu)
+          }
+          neu.combo = 1
+        }
+      }
+      neu.letzteArt = a.art
+      anim('p', 'strike', 400)
+
+      // Ausweichen
+      if (tuer.ausweichrate && Math.random() < tuer.ausweichrate) {
+        fliegen('VERFEHLT', 'miss', true)
+        neu.log = nachricht(`${a.name} – er ist ausgewichen.`, 'bad', neu)
+        return zugEnde(neu)
+      }
+
+      const { schaden, stark, belastung } = berechneSchaden({
+        angriff: a,
         gegner: tuer,
         rank: state.rank,
         belastung: neu.belastung,
         auraBonus,
-        phase: neu.phase,
+        combo: neu.combo,
+        fluch: neu.fluch,
       })
-      // Ausweichen
-      if (tuer.ausweichrate && Math.random() < tuer.ausweichrate) {
-        neu.log = merke(`${tuer.gegnerart} weicht deinem Angriff aus!`, neu)
-        zeigeFloater('DANEBEN', 'var(--dim)', 'rechts')
-      } else if (tuer.blockchance && Math.random() < tuer.blockchance) {
-        const rest = Math.max(1, Math.round(dmg * 0.3))
-        neu.enemyHp = Math.max(0, neu.enemyHp - rest)
-        neu.log = merke(`${tuer.gegnerart} blockt ab – nur ${rest} Schaden.`, neu)
-        zeigeFloater(`−${rest}`, 'var(--dim)', 'rechts')
-        animiere('enemy', 'fight-hit')
-      } else {
-        neu.enemyHp = Math.max(0, neu.enemyHp - dmg)
-        const art = ARTEN[angriff.art]
-        neu.log = merke(
-          `${angriff.name}: ${dmg} ${art.name}-Schaden${auraBonus > 0 ? ' (Aura)' : ''}.`,
-          neu,
-        )
-        zeigeFloater(`−${dmg}`, art.color, 'rechts')
-        animiere('enemy', 'fight-hit')
-      }
-      animiere('player', 'fight-attack-right')
-      neu.belastung += angriff.belastung
-      neu.zug += 1
+      if (neu.fluch > 0) neu.fluch -= 1
 
-      // Boss-Phasen
-      if (tuer.boss) {
-        const p = bossPhase(neu.enemyHp, neu.enemyMaxHp)
-        if (p > neu.phase) {
-          neu.phase = p
-          neu.fluch = true
-          neu.log = merke(
-            `${tuer.gegnerart} wechselt in Phase ${p + 1} – ein Fluch legt sich auf dich!`,
-            neu,
-          )
-        }
-      }
+      neu.enemyHp = Math.max(0, neu.enemyHp - schaden)
+      neu.belastung += belastung
+      fliegen(`-${schaden}`, stark ? 'crit' : '', true)
+      anim('e', 'flinch', 300)
+      ruettel()
+      neu.log = nachricht(`${a.name} trifft für ${schaden} Schaden.`, 'me', neu)
 
-      // Gegner besiegt?
-      if (neu.enemyHp <= 0) {
-        animiere('enemy', 'fight-die')
-        if (neu.enemyIndex + 1 < tuer.anzahl) {
-          neu.enemyIndex += 1
+      if (neu.enemyHp === 0) {
+        neu.lebende -= 1
+        if (neu.lebende > 0) {
+          anim('e', 'die', 400)
           neu.enemyHp = tuer.hp
-          neu.naechsterAngriff = tuer.intervall
-          neu.log = merke(
-            `Gegner ${neu.enemyIndex} fällt – der nächste rückt nach und schlägt härter zu!`,
-            neu,
-          )
-          return neu
+          neu.log = nachricht(`Ein Gegner fällt. Noch ${neu.lebende}.`, 'good', neu)
+          return zugEnde(neu)
         }
+        // Kammer geräumt
+        anim('e', 'die', 1100)
         neu.beendet = 'sieg'
-        // Beute erst beim Sieg ziehen – vorher bleibt sie verdeckt
         const drops = zieheDrops(dungeon.id, state.rank, tuer.boss ? 2 : 1)
-        timers.current.push(
-          setTimeout(() => setPopup({ art: 'sieg', drops }), 600),
-        )
+        timers.current.push(setTimeout(() => setPopup({ art: 'sieg', drops }), 900))
         return neu
       }
-
-      // Gegnerangriff fällig?
-      neu.naechsterAngriff -= 1
-      if (neu.naechsterAngriff <= 0) {
-        neu = gegnerZug(neu, neu.blockBereit ? 'voll' : null)
-      } else if (neu.naechsterAngriff === 1) {
-        neu.log = merke(`${tuer.gegnerart} holt aus: ${tuer.angriffsname}!`, neu)
-      }
-      return neu
+      return zugEnde(neu)
     })
   }
 
@@ -257,46 +274,48 @@ function DungeonFight({ onExit }) {
   function blocken() {
     if (kampfVorbei) return
     setK((kk) => {
-      let neu = { ...kk, belastung: kk.belastung + 3, zug: kk.zug + 1 }
-      const chance = blockChance(tuer)
-      const erfolg = Math.random() < chance
-      neu.naechsterAngriff -= 1
-      if (neu.naechsterAngriff <= 0) {
-        neu = gegnerZug(neu, erfolg ? 'voll' : 'teilweise')
-      } else {
-        neu.blockBereit = erfolg
-        neu.log = merke(
-          erfolg
-            ? 'Plank steht – du bist bereit zu blocken.'
-            : 'Deine Plank wackelt – der nächste Treffer sitzt.',
-          neu,
-        )
+      // Der Wurf entscheidet jetzt, ob der Block hält oder bricht – das Ergebnis
+      // gilt auch, wenn der Angriff erst in einem späteren Zug kommt.
+      const haelt = Math.random() < blockChance(tuer)
+      let neu = {
+        ...kk,
+        belastung: kk.belastung + BELASTUNG_BLOCK,
+        block: haelt ? 'gehalten' : 'gebrochen',
       }
-      return neu
+      anim('p', 'brace', 500)
+      neu.log = nachricht(
+        haelt
+          ? 'Du gehst in den Plank und spannst alles an.'
+          : 'Deine Plank wackelt – der nächste Treffer sitzt.',
+        haelt ? 'me' : 'bad',
+        neu,
+      )
+      return zugEnde(neu)
     })
   }
 
   function heilen() {
     if (kampfVorbei) return
     setK((kk) => {
-      if (kk.heilungen <= 0) return kk
-      let heilung = HEILUNG_PRO_STUFE[belastungsStufe(kk.belastung)]
-      if (kk.fluch) heilung = Math.round(heilung * FLUCH_HEILUNG)
+      if (kk.heilungen <= 0) {
+        return { ...kk, log: nachricht('Keine Kraft mehr zum Regenerieren.', 'bad', kk) }
+      }
+      const eff = HEILUNG_ANTEIL[belastungsStufe(kk.belastung)]
+      const h = Math.round(MAX_VITALITAET * eff)
       let neu = {
         ...kk,
         heilungen: kk.heilungen - 1,
-        vitalitaet: Math.min(MAX_VITALITAET, kk.vitalitaet + heilung),
-        belastung: Math.max(0, kk.belastung - 5),
-        zug: kk.zug + 1,
+        vitalitaet: Math.min(MAX_VITALITAET, kk.vitalitaet + h),
+        belastung: kk.belastung + BELASTUNG_HEILEN,
       }
-      neu.log = merke(
-        `Dehnen: +${heilung} Vitalität${kk.fluch ? ' (Fluch schwächt dich)' : ''}.`,
+      fliegen(`+${h}`, 'crit', false)
+      neu.log = nachricht(
+        `Dehnen und tief atmen – ${h} Vitalität zurück.` +
+          (kk.belastung >= 100 ? ' Ermüdet erholst du dich schlechter.' : ''),
+        'good',
         neu,
       )
-      zeigeFloater(`+${heilung}`, 'var(--ok)', 'links')
-      neu.naechsterAngriff -= 1
-      if (neu.naechsterAngriff <= 0) neu = gegnerZug(neu, null)
-      return neu
+      return zugEnde(neu)
     })
   }
 
@@ -306,59 +325,58 @@ function DungeonFight({ onExit }) {
     setPopup(null)
     onExit()
   }
-
   function niederlageBestaetigen() {
     dispatch({ type: 'DUNGEON_DEFEAT' })
     setPopup(null)
     onExit()
   }
-
   function rasten() {
     dispatch({ type: 'DUNGEON_REST' })
     onExit()
   }
 
-  const auraStufe = auraStage(state.aura, state.level)
+  const restZuege = tuer.intervall - (k.zug % tuer.intervall)
+  const gleichAngriff = restZuege === 1
 
   return (
     <div
       className="fixed inset-0 z-40 flex flex-col"
-      style={{ height: '100dvh', background: 'var(--bg)' }}
+      style={{ height: '100dvh', background: 'var(--bg)', padding: '10px 12px 12px' }}
     >
       {/* Kopfzeile */}
-      <div
-        className="flex shrink-0 items-center justify-between border-b px-3 py-2"
-        style={{ borderColor: 'var(--line)' }}
-      >
+      <div className="flex shrink-0 items-center gap-2 px-0.5 pb-2">
         <button
           type="button"
           onClick={rasten}
-          className="bg-transparent px-3 py-1.5"
+          className="bg-transparent px-2.5 py-1.5"
           style={{
             ...orbitron,
             fontSize: '9px',
-            letterSpacing: '2px',
-            color: 'var(--ok)',
-            border: '1px solid var(--ok)',
-            borderRadius: '8px',
+            letterSpacing: '1px',
+            color: 'var(--dim)',
+            border: '1px solid var(--line)',
+            borderRadius: '9px',
           }}
         >
           RASTEN
         </button>
-        <p style={{ ...orbitron, fontSize: '11px', letterSpacing: '2px' }}>
+        <p
+          className="flex-1 text-center"
+          style={{ ...orbitron, fontSize: '10px', letterSpacing: '2px', color: 'var(--glow)' }}
+        >
           TÜR {tuer.nr} / {dungeon.tueren.length}
         </p>
         <button
           type="button"
-          onClick={() => setInfo((v) => !v)}
-          className="bg-transparent px-3 py-1.5"
+          onClick={() => setInfo(true)}
+          className="bg-transparent px-2.5 py-1.5"
           style={{
             ...orbitron,
             fontSize: '9px',
-            letterSpacing: '2px',
-            color: 'var(--glow)',
-            border: '1px solid var(--glow)',
-            borderRadius: '8px',
+            letterSpacing: '1px',
+            color: 'var(--dim)',
+            border: '1px solid var(--line)',
+            borderRadius: '9px',
           }}
         >
           INFO
@@ -366,117 +384,97 @@ function DungeonFight({ onExit }) {
       </div>
 
       {/* Arena */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2">
-        <div className="flex min-h-0 flex-1 items-stretch justify-between gap-2">
+      <div
+        className={`relative min-h-0 flex-1 overflow-hidden ${shake ? 'arena-shake' : ''}`}
+        style={{
+          border: `1px solid ${mi === 3 ? 'rgba(255,77,94,.7)' : 'rgba(255,77,94,.3)'}`,
+          borderRadius: '14px',
+          background:
+            'radial-gradient(ellipse at 50% 78%,rgba(255,77,94,.09),transparent 60%),#090c15',
+          boxShadow: mi === 3 ? 'inset 0 0 40px rgba(255,77,94,.16)' : 'none',
+        }}
+      >
+        <div className="absolute inset-0 flex items-end justify-between px-1 pb-[46px]">
           {/* Spieler */}
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="relative flex min-h-0 flex-1 items-center justify-center">
-              {auraStufe.bonus > 0 && (
-                <div
-                  className="aura-ring absolute rounded-full"
-                  style={{
-                    width: '78%',
-                    aspectRatio: '1',
-                    border: '1px solid var(--xp)',
-                    opacity: 0.65,
-                  }}
-                />
-              )}
-              <FightSprite
-                name="player"
-                className={`relative h-full w-full fight-idle ${anim.player}`}
-              />
-              {floater?.seite === 'links' && (
-                <span
-                  key={floater.id}
-                  className="float-up absolute left-1/2 top-4"
-                  style={{ ...orbitron, fontSize: '15px', color: floater.farbe }}
-                >
-                  {floater.text}
-                </span>
-              )}
+          <div className="relative flex w-[47%] flex-col items-center">
+            <FightSprite
+              name="player"
+              id="pfig"
+              className={`w-full ${pAnim}`}
+              style={{ height: 'min(34vh, 140px)' }}
+            />
+            <div className="mt-0.5 text-center">
+              <div style={{ ...orbitron, fontSize: '12px', fontWeight: 900, color: 'var(--glow)' }}>
+                {state.name}
+              </div>
             </div>
-            <p
-              className="mt-1 truncate text-center"
-              style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px' }}
-            >
-              {state.name.toUpperCase()}
-            </p>
             <Leiste
               wert={k.vitalitaet}
               max={MAX_VITALITAET}
-              farbe="linear-gradient(90deg,#7a1622,var(--danger))"
-              glow="0 0 8px rgba(255,77,94,.6)"
+              mine
+              farbe={
+                k.vitalitaet <= MAX_VITALITAET * 0.3
+                  ? 'linear-gradient(90deg,#8b1a28,#ff4d5e)'
+                  : 'linear-gradient(90deg,#1e7f52,#4dffa6)'
+              }
+              glow="0 0 9px rgba(77,255,166,.4)"
             />
-            <p
-              className="text-center"
-              style={{ ...orbitron, fontSize: '8px', color: 'var(--dim)' }}
-            >
-              {k.vitalitaet} / {MAX_VITALITAET}
-            </p>
+            <div style={{ ...orbitron, fontSize: '8.5px', color: 'var(--dim)', marginTop: 3 }}>
+              {k.vitalitaet} / {MAX_VITALITAET} VIT
+            </div>
           </div>
 
           {/* Gegner */}
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="relative flex min-h-0 flex-1 items-center justify-center">
-              <FightSprite
-                name={spriteFor(tuer.gegnerart)}
-                className={`h-full w-full fight-idle ${anim.enemy}`}
-              />
-              {floater?.seite === 'rechts' && (
+          <div className="relative flex w-[47%] flex-col items-center">
+            {tuer.anzahl > 1 && (
+              <span
+                className="absolute right-0.5 top-0 z-[2] px-1.5 py-0.5"
+                style={{
+                  ...orbitron,
+                  fontSize: '9px',
+                  color: 'var(--dim)',
+                  border: '1px solid var(--line)',
+                  borderRadius: '8px',
+                  background: 'rgba(5,7,13,.7)',
+                }}
+              >
+                ×{k.lebende}
+              </span>
+            )}
+            <FightSprite
+              name={tuer.sprite}
+              id="efig"
+              className={`w-full ${eAnim} ${mi === 3 && !kampfVorbei ? 'rage' : ''}`}
+              style={{ height: 'min(34vh, 140px)' }}
+            />
+            <div className="mt-0.5 text-center">
+              <div style={{ ...orbitron, fontSize: '12px', fontWeight: 900 }}>
+                {tuer.gegnerart}
+              </div>
+              <div className="mt-0.5 flex flex-wrap justify-center gap-1">
                 <span
-                  key={floater.id}
-                  className="float-up absolute left-1/2 top-4"
-                  style={{ ...orbitron, fontSize: '15px', color: floater.farbe }}
-                >
-                  {floater.text}
-                </span>
-              )}
-              <div className="absolute right-0 top-0 flex flex-col items-end gap-1">
-                {gegnerRest > 1 && (
-                  <span
-                    className="px-1.5 py-0.5"
-                    style={{
-                      ...orbitron,
-                      fontSize: '8px',
-                      color: 'var(--text)',
-                      border: '1px solid var(--line)',
-                      borderRadius: '5px',
-                      background: 'rgba(10,17,32,.9)',
-                    }}
-                  >
-                    ×{gegnerRest}
-                  </span>
-                )}
-                <span
-                  className="px-1.5 py-0.5"
+                  className="inline-block px-1.5 py-0.5"
                   style={{
                     ...orbitron,
-                    fontSize: '7px',
-                    letterSpacing: '1px',
-                    color: k.phase > 0 ? 'var(--danger)' : 'var(--dim)',
-                    border: `1px solid ${k.phase > 0 ? 'var(--danger)' : 'var(--line)'}`,
-                    borderRadius: '5px',
-                    background: 'rgba(10,17,32,.9)',
+                    fontSize: '7.5px',
+                    letterSpacing: '1.5px',
+                    color: MOODS[mi][1],
+                    border: `1px solid ${MOODS[mi][1]}`,
+                    borderRadius: '7px',
                   }}
                 >
-                  {k.enemyHp / k.enemyMaxHp <= 0.33
-                    ? 'VERZWEIFELT'
-                    : k.enemyHp / k.enemyMaxHp <= 0.66
-                      ? 'ANGESCHLAGEN'
-                      : 'WACHSAM'}
+                  {MOODS[mi][0]}
                 </span>
                 {auraBonus > 0 && (
                   <span
-                    className="px-1.5 py-0.5"
+                    className="inline-block px-1.5 py-0.5"
                     style={{
                       ...orbitron,
-                      fontSize: '7px',
-                      letterSpacing: '1px',
+                      fontSize: '7.5px',
+                      letterSpacing: '1.5px',
                       color: 'var(--xp)',
                       border: '1px solid var(--xp)',
-                      borderRadius: '5px',
-                      background: 'rgba(10,17,32,.9)',
+                      borderRadius: '7px',
                       textShadow: '0 0 6px rgba(143,224,255,.7)',
                     }}
                   >
@@ -485,230 +483,273 @@ function DungeonFight({ onExit }) {
                 )}
               </div>
             </div>
-            <p
-              className="mt-1 truncate text-center"
-              style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px' }}
-            >
-              {tuer.gegnerart.toUpperCase()}
-            </p>
             <Leiste
               wert={k.enemyHp}
               max={k.enemyMaxHp}
-              farbe="linear-gradient(90deg,#7a1622,var(--danger))"
-              glow="0 0 8px rgba(255,77,94,.6)"
+              farbe="linear-gradient(90deg,#8b1a28,#ff4d5e)"
+              glow="0 0 9px rgba(255,77,94,.4)"
             />
-            <p
-              className="text-center"
-              style={{ ...orbitron, fontSize: '8px', color: 'var(--dim)' }}
-            >
-              {k.enemyHp} / {k.enemyMaxHp}
-            </p>
+            <div style={{ ...orbitron, fontSize: '8.5px', color: 'var(--dim)', marginTop: 3 }}>
+              {k.enemyHp} / {k.enemyMaxHp} HP
+            </div>
           </div>
         </div>
 
+        {/* Schadenszahlen */}
+        {flies.map((f) => (
+          <div
+            key={f.id}
+            className={`dmgnum ${f.klasse}`}
+            style={{ left: f.rechts ? '74%' : '26%' }}
+          >
+            {f.text}
+          </div>
+        ))}
+        {slam && <div className="slam" />}
+        {roar && <div className="roar">{roar}</div>}
+
         {/* Kampflog, zwei Zeilen */}
-        <div
-          className="mt-2 shrink-0 border px-2 py-1"
-          style={{
-            borderColor: 'var(--line)',
-            borderRadius: '8px',
-            background: 'rgba(10,17,32,.85)',
-            height: '38px',
-          }}
-        >
-          {k.log.slice(0, 2).map((zeile, i) => (
-            <p
+        <div className="pointer-events-none absolute bottom-[5px] left-[9px] right-[9px] z-[3]">
+          {k.log.slice(0, 2).map((z, i) => (
+            <div
               key={i}
-              className="truncate"
+              className="blog-line truncate"
               style={{
-                fontSize: '10px',
-                color: i === 0 ? 'var(--text)' : 'var(--dim)',
-                lineHeight: '17px',
+                fontSize: '11.5px',
+                lineHeight: 1.5,
+                color:
+                  z.art === 'me'
+                    ? 'var(--text)'
+                    : z.art === 'bad'
+                      ? 'var(--danger)'
+                      : z.art === 'good'
+                        ? 'var(--ok)'
+                        : 'var(--dim)',
               }}
             >
-              {zeile}
-            </p>
+              › {z.text}
+            </div>
           ))}
         </div>
       </div>
 
       {/* Belastung + Aura */}
-      <div className="flex shrink-0 gap-3 px-3 pt-1">
-        <div className="flex-1">
-          <p style={{ ...orbitron, fontSize: '8px', color: 'var(--dim)' }}>
-            BELASTUNG · {BELASTUNG_LABELS[stufe]}
-          </p>
-          <Leiste
-            wert={k.belastung}
-            max={BELASTUNG_VIERTEL}
-            farbe={
-              stufe === 0
-                ? 'var(--ok)'
-                : stufe === 1
-                  ? 'var(--xp)'
-                  : 'var(--danger)'
-            }
-            glow="none"
-            hoehe={5}
-          />
+      <div className="shrink-0 pt-[7px]">
+        <div className="grid grid-cols-2 gap-[9px]">
+          <div>
+            <b style={{ ...orbitron, fontSize: '8px', letterSpacing: '1.5px', color: 'var(--dim)', display: 'block', marginBottom: 3 }}>
+              BELASTUNG {k.belastung} · {BELASTUNG_LABELS[stufe]}
+            </b>
+            <div
+              className="flex overflow-hidden rounded-lg border"
+              style={{ height: 8, background: '#0c1420', borderColor: 'var(--line)' }}
+            >
+              <i style={{ width: `${Math.min(k.belastung, 100) / 3}%`, background: 'var(--ok)', transition: 'width .35s' }} />
+              <i style={{ width: `${Math.min(Math.max(k.belastung - 100, 0), 100) / 3}%`, background: '#ffd95e', transition: 'width .35s' }} />
+              <i style={{ width: `${Math.min(Math.max(k.belastung - 200, 0), 100) / 3}%`, background: '#ff9440', transition: 'width .35s' }} />
+            </div>
+          </div>
+          <div>
+            <b style={{ ...orbitron, fontSize: '8px', letterSpacing: '1.5px', color: 'var(--dim)', display: 'block', marginBottom: 3 }}>
+              AURA {state.aura} · {auraStufe.name.toUpperCase()}
+            </b>
+            <div
+              className="overflow-hidden rounded-lg border"
+              style={{ height: 8, background: '#0c1420', borderColor: 'var(--line)' }}
+            >
+              <i
+                className="block h-full"
+                style={{
+                  width: `${(auraStufe.bonus / 25) * 100}%`,
+                  background: 'linear-gradient(90deg,#2e7fd4,#8fe0ff)',
+                  transition: 'width .35s',
+                }}
+              />
+            </div>
+          </div>
         </div>
-        <div className="flex-1">
-          <p style={{ ...orbitron, fontSize: '8px', color: 'var(--dim)' }}>
-            AURA · {auraStufe.name.toUpperCase()}
-          </p>
-          <Leiste
-            wert={auraStufe.bonus}
-            max={25}
-            farbe="var(--xp)"
-            glow="0 0 6px rgba(143,224,255,.6)"
-            hoehe={5}
-          />
+
+        {/* Ankündigung */}
+        <div
+          className={`flex h-5 items-center ${gleichAngriff ? 'tele-now' : ''}`}
+          style={{
+            marginTop: 6,
+            fontSize: '11.5px',
+            color: gleichAngriff ? 'var(--danger)' : '#ffd95e',
+          }}
+        >
+          {gleichAngriff
+            ? `${tuer.gegnerart} holt aus – ${tuer.angriffsname} im nächsten Zug!`
+            : `${tuer.gegnerart} sammelt Kraft · ${tuer.angriffsname} in ${restZuege} Zügen`}
         </div>
       </div>
 
-      {/* Ankündigung */}
-      <p
-        className={`shrink-0 px-3 py-1 text-center ${k.naechsterAngriff <= 1 ? 'warn-blink' : ''}`}
-        style={{
-          ...orbitron,
-          fontSize: '9px',
-          letterSpacing: '1px',
-          color: k.naechsterAngriff <= 1 ? 'var(--danger)' : 'var(--dim)',
-        }}
-      >
-        {k.naechsterAngriff <= 1
-          ? `⚠ ${tuer.angriffsname.toUpperCase()} KOMMT`
-          : `NÄCHSTER ANGRIFF IN ${k.naechsterAngriff} ZÜGEN`}
-      </p>
-
       {/* Angriffe */}
-      <div className="grid shrink-0 grid-cols-3 gap-1.5 px-3">
+      <div className="grid shrink-0 grid-cols-2 gap-1.5" style={{ marginTop: 6 }}>
         {ANGRIFFE.map((a) => {
           const art = ARTEN[a.art]
-          const schwach = tuer.schwaechen?.includes(a.art)
-          const resist = tuer.resistenzen?.includes(a.art)
+          const schwach = tuer.schwaechen?.[a.art] > 1
+          const resist = tuer.resistenzen?.[a.art] < 1
           return (
             <button
               key={a.id}
               type="button"
               onClick={() => angreifen(a)}
-              className="bg-transparent px-1 py-1.5"
+              className="text-left"
               style={{
-                border: `1px solid ${schwach ? 'var(--ok)' : 'var(--line)'}`,
-                borderRadius: '9px',
-                opacity: resist ? 0.55 : 1,
+                border: `1px solid ${schwach ? 'var(--ok)' : 'var(--glow)'}`,
+                background: 'rgba(63,182,255,.08)',
+                color: 'var(--text)',
+                borderRadius: '10px',
+                padding: '7px 8px',
+                fontSize: '13.5px',
+                fontWeight: 600,
+                lineHeight: 1.1,
+                opacity: resist ? 0.6 : 1,
               }}
             >
-              <p style={{ ...orbitron, fontSize: '8px', letterSpacing: '0.5px' }}>
-                {a.kurz}
-              </p>
-              <p style={{ fontSize: '9px', color: art.color }}>
-                {a.reps} {a.einheit}
+              {a.name}
+              <small
+                style={{
+                  ...orbitron,
+                  display: 'block',
+                  fontSize: '7px',
+                  letterSpacing: '1px',
+                  color: schwach ? 'var(--ok)' : art.color,
+                  marginTop: 1,
+                }}
+              >
+                {a.einheit} · {art.name.toUpperCase()}
                 {schwach ? ' ▲' : resist ? ' ▼' : ''}
-              </p>
+              </small>
             </button>
           )
         })}
       </div>
 
       {/* Reaktionen */}
-      <div className="grid shrink-0 grid-cols-2 gap-1.5 px-3 pb-3 pt-1.5">
+      <div className="grid shrink-0 grid-cols-2 gap-1.5" style={{ marginTop: 6 }}>
         <button
           type="button"
           onClick={blocken}
-          className="bg-transparent py-2"
+          className="text-left"
           style={{
-            ...orbitron,
-            fontSize: '9px',
-            letterSpacing: '1px',
-            color: 'var(--glow)',
-            border: '1px solid var(--glow)',
-            borderRadius: '9px',
+            border: '1px solid var(--ok)',
+            background: 'rgba(77,255,166,.07)',
+            color: 'var(--text)',
+            borderRadius: '10px',
+            padding: '7px 6px',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            lineHeight: 1.1,
           }}
         >
-          PLANK · BLOCKEN
+          Plank
+          <small style={{ ...orbitron, display: 'block', fontSize: '6.5px', letterSpacing: '1px', color: 'var(--dim)', marginTop: 1 }}>
+            BLOCKEN {Math.round(blockChance(tuer) * 100)}%
+          </small>
         </button>
         <button
           type="button"
           onClick={heilen}
           disabled={k.heilungen <= 0}
-          className="bg-transparent py-2 disabled:opacity-40"
+          className="text-left disabled:opacity-40"
           style={{
-            ...orbitron,
-            fontSize: '9px',
-            letterSpacing: '1px',
-            color: 'var(--ok)',
             border: '1px solid var(--ok)',
-            borderRadius: '9px',
+            background: 'rgba(77,255,166,.07)',
+            color: 'var(--text)',
+            borderRadius: '10px',
+            padding: '7px 6px',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            lineHeight: 1.1,
           }}
         >
-          DEHNEN · HEILEN ({k.heilungen})
+          Dehnen
+          <small style={{ ...orbitron, display: 'block', fontSize: '6.5px', letterSpacing: '1px', color: 'var(--dim)', marginTop: 1 }}>
+            HEILEN ({k.heilungen})
+          </small>
         </button>
       </div>
 
-      {/* Info-Einblendung */}
+      {/* Info */}
       {info && (
         <div
-          className="absolute inset-0 z-50 flex items-center justify-center px-6"
-          style={{ background: 'rgba(2,4,9,.85)' }}
+          className="fixed inset-0 z-[60] grid place-items-center p-[22px]"
+          style={{ background: 'rgba(3,5,10,.9)', backdropFilter: 'blur(3px)' }}
           onClick={() => setInfo(false)}
         >
           <div
-            className="w-full max-w-[320px] rounded-[16px] border p-4"
-            style={{ background: 'var(--panel)', borderColor: 'var(--glow)' }}
+            className="w-full max-w-[340px] rounded-2xl p-[22px]"
+            style={{ background: 'var(--panel)', border: '1px solid var(--glow)' }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <p style={{ ...orbitron, fontSize: '11px', color: 'var(--glow)', letterSpacing: '2px' }}>
-              ◆ {tuer.gegnerart.toUpperCase()}
-            </p>
-            <p className="mt-2" style={{ fontSize: '12px', color: 'var(--dim)' }}>
-              Angriff: {tuer.angriffsname} · {tuer.schaden} Schaden alle{' '}
-              {tuer.intervall} Züge
-            </p>
-            <p style={{ fontSize: '12px', color: 'var(--ok)' }}>
-              Schwach gegen:{' '}
-              {tuer.schwaechen?.map((s) => ARTEN[s].name).join(', ') || '–'}
-            </p>
-            <p style={{ fontSize: '12px', color: 'var(--danger)' }}>
-              Resistent gegen:{' '}
-              {tuer.resistenzen?.map((s) => ARTEN[s].name).join(', ') || '–'}
-            </p>
-            <p className="mt-2" style={{ fontSize: '11px', color: 'var(--dim)' }}>
-              Block-Chance: {Math.round(blockChance(tuer) * 100)}% · Ausweichen:{' '}
-              {Math.round((tuer.ausweichrate ?? 0) * 100)}%
-              {tuer.combo ? ' · Combo' : ''}
-            </p>
-            <p className="mt-2" style={{ fontSize: '11px', color: 'var(--xp)' }}>
-              Einschüchterung: +{auraBonus}% Schaden
-            </p>
-            <div
-              className="mt-3 border px-2 py-2 text-center"
-              style={{ borderColor: 'var(--line)', borderRadius: '8px' }}
-            >
-              <p
-                style={{
-                  ...orbitron,
-                  fontSize: '9px',
-                  letterSpacing: '2px',
-                  color: 'var(--dim)',
-                }}
-              >
-                BEUTE
-              </p>
-              <p
-                style={{
-                  ...orbitron,
-                  fontSize: '18px',
-                  letterSpacing: '6px',
-                  color: 'var(--dim)',
-                }}
-              >
-                ? ? ?
-              </p>
-              <p style={{ fontSize: '10px', color: 'var(--dim)' }}>
-                {tuer.boss ? 'Zwei Funde' : 'Ein Fund'} · wird nach dem Sieg
-                aufgedeckt
-              </p>
+            <h3 style={{ ...orbitron, fontSize: '12px', letterSpacing: '3px', color: 'var(--glow)', marginBottom: 12 }}>
+              {tuer.gegnerart.toUpperCase()}
+            </h3>
+            <b style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px', color: 'var(--dim)', display: 'block' }}>
+              ANFÄLLIG GEGEN
+            </b>
+            <div className="mt-1">
+              {tuer.combo ? (
+                <span className="tag-w">Übungswechsel ×1,5</span>
+              ) : Object.keys(tuer.schwaechen ?? {}).length > 0 ? (
+                Object.entries(tuer.schwaechen).map(([a, m]) => (
+                  <span key={a} className="tag-w">
+                    {ARTEN[a].name} ×{m}
+                  </span>
+                ))
+              ) : (
+                <span className="tag-r">keine bekannte Schwäche</span>
+              )}
             </div>
+            <b style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px', color: 'var(--dim)', display: 'block', marginTop: 12 }}>
+              RESISTENT
+            </b>
+            <div className="mt-1">
+              {Object.entries(tuer.resistenzen ?? {}).map(([a, m]) => (
+                <span key={a} className="tag-r">
+                  {ARTEN[a].name} ×{String(m).replace('.', ',')}
+                </span>
+              ))}
+              {tuer.ausweichrate && <span className="tag-r">weicht oft aus</span>}
+              {Object.keys(tuer.resistenzen ?? {}).length === 0 && !tuer.ausweichrate && (
+                <span className="tag-w">keine</span>
+              )}
+            </div>
+            <b style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px', color: 'var(--dim)', display: 'block', marginTop: 12 }}>
+              GEGEN IHN
+            </b>
+            <p style={{ fontSize: '12px', color: 'var(--dim)', marginTop: 4 }}>
+              Blockchance <span style={{ color: 'var(--glow)' }}>{Math.round(blockChance(tuer) * 100)}%</span> ·
+              Heilungen: <span style={{ color: 'var(--ok)' }}>{k.heilungen}</span> ·
+              Einschüchterung: <span style={{ color: 'var(--xp)' }}>+{auraBonus}%</span>
+            </p>
+            <b style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px', color: 'var(--dim)', display: 'block', marginTop: 12 }}>
+              BEUTE
+            </b>
+            <p style={{ ...orbitron, fontSize: '18px', letterSpacing: '6px', color: 'var(--dim)', marginTop: 4 }}>
+              ? ? ?
+            </p>
+            <p style={{ fontSize: '11px', color: 'var(--dim)' }}>
+              {tuer.boss ? 'Zwei Funde' : 'Ein Fund'} · wird nach dem Sieg aufgedeckt
+            </p>
+            <button
+              type="button"
+              onClick={() => setInfo(false)}
+              className="mt-4 w-full bg-transparent"
+              style={{
+                ...orbitron,
+                letterSpacing: '2px',
+                fontSize: '11px',
+                color: 'var(--glow)',
+                border: '1px solid var(--glow)',
+                borderRadius: '11px',
+                padding: 11,
+              }}
+            >
+              SCHLIESSEN
+            </button>
           </div>
         </div>
       )}
@@ -716,62 +757,52 @@ function DungeonFight({ onExit }) {
       {/* Ergebnis */}
       {popup && (
         <div
-          className="absolute inset-0 z-50 flex items-center justify-center px-6"
-          style={{ background: 'rgba(2,4,9,.85)' }}
+          className="fixed inset-0 z-[60] grid place-items-center p-[22px]"
+          style={{ background: 'rgba(3,5,10,.9)', backdropFilter: 'blur(3px)' }}
         >
           <div
-            className="w-full max-w-[320px] rounded-[16px] border p-5 text-center"
+            className="w-full max-w-[340px] rounded-2xl p-[22px] text-center"
             style={{
               background: 'var(--panel)',
-              borderColor:
-                popup.art === 'sieg' ? 'var(--ok)' : 'var(--danger)',
-              boxShadow: `0 0 30px ${popup.art === 'sieg' ? 'rgba(77,255,166,.3)' : 'rgba(255,77,94,.3)'}`,
+              border: `1px solid ${popup.art === 'sieg' ? 'var(--ok)' : 'var(--danger)'}`,
+              boxShadow: `0 0 40px ${popup.art === 'sieg' ? 'rgba(77,255,166,.3)' : 'rgba(255,77,94,.3)'}`,
             }}
           >
-            <p
+            <div style={{ fontSize: 36 }}>
+              {popup.art === 'sieg' ? (tuer.boss ? '👑' : '⚔️') : '🛡️'}
+            </div>
+            <h2
               style={{
                 ...orbitron,
-                fontSize: '18px',
-                letterSpacing: '2px',
+                fontSize: '15px',
+                letterSpacing: '3px',
                 color: popup.art === 'sieg' ? 'var(--ok)' : 'var(--danger)',
+                margin: '6px 0 10px',
               }}
             >
-              {popup.art === 'sieg' ? 'TÜR GESCHAFFT' : 'RÜCKZUG'}
-            </p>
-            <p className="mt-2 text-[13px]" style={{ color: 'var(--dim)' }}>
               {popup.art === 'sieg'
                 ? tuer.boss
-                  ? `${dungeon.boss} ist besiegt – der Dungeon ist abgeschlossen!`
-                  : `${tuer.name} ist geräumt.`
-                : 'Du wirst aus dem Dungeon getragen. Deine XP behältst du, deine Aura nicht.'}
+                  ? 'BOSS BEZWUNGEN'
+                  : 'TÜR GEÖFFNET'
+                : 'RÜCKZUG'}
+            </h2>
+            <p style={{ color: 'var(--dim)', fontSize: '13.5px', lineHeight: 1.6 }}>
+              {popup.art === 'sieg'
+                ? tuer.boss
+                  ? `${dungeon.name} ist abgeschlossen.`
+                  : `Tür ${tuer.nr} ist frei. Der Weg führt weiter.`
+                : 'Deine Vitalität ist erschöpft. Das System zieht dich aus dem Dungeon.'}
             </p>
 
             {popup.art === 'sieg' && (
               <div className="mt-3 flex flex-col gap-2">
-                <p
-                  style={{
-                    ...orbitron,
-                    fontSize: '9px',
-                    letterSpacing: '2px',
-                    color: 'var(--dim)',
-                  }}
-                >
-                  BEUTE
-                </p>
                 {popup.drops?.map((drop, i) => {
                   if (drop.art === 'material') {
                     const m = MATERIALIEN[drop.material]
                     return (
-                      <div
-                        key={i}
-                        className="border px-2 py-1.5"
-                        style={{ borderColor: m.color, borderRadius: '8px' }}
-                      >
+                      <div key={i} className="border px-2 py-1.5" style={{ borderColor: m.color, borderRadius: 8 }}>
                         <p style={{ fontSize: '13px', color: m.color }}>
                           {m.name} ×{drop.menge}
-                        </p>
-                        <p style={{ fontSize: '10px', color: 'var(--dim)' }}>
-                          Materialien-Bündel
                         </p>
                       </div>
                     )
@@ -781,30 +812,18 @@ function DungeonFight({ onExit }) {
                   return (
                     <div
                       key={i}
-                      className={drop.glueck ? 'aura-ring' : ''}
                       style={{
                         border: `1px solid ${farbe}`,
-                        borderRadius: '8px',
+                        borderRadius: 8,
                         padding: '6px 8px',
                         boxShadow: drop.glueck ? `0 0 18px ${farbe}` : 'none',
                       }}
                     >
                       <p style={{ fontSize: '13px', color: farbe }}>
-                        {item.name}{' '}
-                        <span style={{ fontSize: '10px' }}>
-                          {STUFEN_INFO[item.stufe].name}
-                        </span>
+                        {item.name} <span style={{ fontSize: '10px' }}>{STUFEN_INFO[item.stufe].name}</span>
                       </p>
                       {drop.glueck && (
-                        <p
-                          style={{
-                            ...orbitron,
-                            fontSize: '9px',
-                            letterSpacing: '1px',
-                            color: farbe,
-                            textShadow: `0 0 8px ${farbe}`,
-                          }}
-                        >
+                        <p style={{ ...orbitron, fontSize: '9px', color: farbe, textShadow: `0 0 8px ${farbe}` }}>
                           ✦ GLÜCKSFUND ✦
                         </p>
                       )}
@@ -813,22 +832,31 @@ function DungeonFight({ onExit }) {
                 })}
               </div>
             )}
+            {popup.art === 'niederlage' && (
+              <div style={{ ...orbitron, color: 'var(--danger)', fontSize: '12px', marginTop: 10, lineHeight: 1.9 }}>
+                Aura erlischt
+                <br />
+                Ein getragenes Item wird beschädigt
+                <br />
+                Durchgang beginnt wieder bei Tür 1
+              </div>
+            )}
+
             <button
               type="button"
-              onClick={
-                popup.art === 'sieg' ? siegBestaetigen : niederlageBestaetigen
-              }
-              className="mt-4 bg-transparent px-5 py-2"
+              onClick={popup.art === 'sieg' ? siegBestaetigen : niederlageBestaetigen}
+              className="mt-4 w-full bg-transparent"
               style={{
                 ...orbitron,
-                fontSize: '10px',
                 letterSpacing: '2px',
+                fontSize: '11px',
                 color: popup.art === 'sieg' ? 'var(--ok)' : 'var(--danger)',
                 border: `1px solid ${popup.art === 'sieg' ? 'var(--ok)' : 'var(--danger)'}`,
-                borderRadius: '10px',
+                borderRadius: '11px',
+                padding: 11,
               }}
             >
-              WEITER
+              BESTÄTIGEN
             </button>
           </div>
         </div>

@@ -2,13 +2,11 @@ import { useEffect, useState } from 'react'
 import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import {
-  DUNGEON_RUNS,
   GEFAHRSTUFEN,
+  HOEHERE_DUNGEONS,
   dungeonsByRank,
   findDungeon,
-  doorHp,
 } from '../data/dungeons.js'
-import { RANKS } from '../data/ranks.js'
 import DungeonFight from './DungeonFight.jsx'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
@@ -87,7 +85,6 @@ function GateOverlay({ onDone }) {
 
 function Auswahl({ state, dispatch }) {
   const eigene = dungeonsByRank(state.rank)
-  const hoehereRaenge = RANKS.slice(RANKS.indexOf(state.rank) + 1)
 
   return (
     <div className="flex flex-col gap-4">
@@ -137,12 +134,6 @@ function Auswahl({ state, dispatch }) {
                   </div>
                   <p style={{ fontSize: '12px', color: 'var(--dim)' }}>
                     {d.beschreibung}
-                  </p>
-                  <p
-                    className="mt-1"
-                    style={{ ...orbitron, fontSize: '9px', color: 'var(--dim)', letterSpacing: '1px' }}
-                  >
-                    {d.tueren.length} TÜREN · BOSS: {d.boss.toUpperCase()}
                     {gesperrt && ' · GESPERRT'}
                   </p>
                 </button>
@@ -160,36 +151,42 @@ function Auswahl({ state, dispatch }) {
 
       <Panel title="HÖHERE RÄNGE">
         <div className="flex flex-col gap-2">
-          {hoehereRaenge.map((rank) => {
-            const anzahl = DUNGEON_RUNS.filter((d) => d.rank === rank).length
-            return (
-              <div
-                key={rank}
-                className="flex items-center justify-between gap-3 border p-3"
-                style={{ borderColor: 'var(--line)', borderRadius: '12px' }}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    style={{ ...orbitron, fontSize: '18px', color: '#31465f' }}
-                  >
-                    {rank}
-                  </span>
-                  <p style={{ ...orbitron, fontSize: '11px', color: '#31465f', letterSpacing: '2px' }}>
-                    ??? {anzahl > 0 && `(${anzahl})`}
-                  </p>
-                </div>
-                <span
-                  style={{ ...orbitron, fontSize: '9px', color: 'var(--dim)', letterSpacing: '1px' }}
+          {HOEHERE_DUNGEONS.map((d) => (
+            <div
+              key={d.name}
+              className="flex items-center justify-between gap-3 border p-3"
+              style={{ borderColor: 'var(--line)', borderRadius: '12px', opacity: 0.4 }}
+            >
+              <div className="min-w-0">
+                <p
+                  className="text-[15px] font-semibold"
+                  style={{ color: GEFAHRSTUFEN[d.gefahr].color }}
                 >
-                  VERSCHLOSSEN
-                </span>
+                  {d.name}
+                </p>
+                <p style={{ fontSize: '11px', color: 'var(--dim)' }}>
+                  Rang {d.rank} · Boss: {d.boss}
+                </p>
               </div>
-            )
-          })}
+              <span
+                className="shrink-0 px-2 py-0.5"
+                style={{
+                  ...orbitron,
+                  fontSize: '9px',
+                  letterSpacing: '1px',
+                  color: 'var(--dim)',
+                  border: '1px solid var(--line)',
+                  borderRadius: '8px',
+                }}
+              >
+                {d.rank}-RANG
+              </span>
+            </div>
+          ))}
         </div>
         <p className="mt-3" style={{ fontSize: '12px', color: 'var(--dim)' }}>
-          Dein Rang bestimmt, welche Tore sich dir öffnen. Steig auf, um
-          tiefere Dungeons zu betreten.
+          Dein Rang bestimmt den Zugang. Als D-Rang öffnen sich E- und
+          D-Dungeons.
         </p>
       </Panel>
     </div>
@@ -295,7 +292,7 @@ function Tuerkarte({ state, dispatch, dungeon, onFight }) {
                       </p>
                       <p style={{ fontSize: '11px', color: 'var(--dim)' }}>
                         {offen || fertig
-                          ? `${tuer.anzahl}× ${tuer.gegnerart} · ${doorHp(tuer)} HP`
+                          ? `${tuer.anzahl > 1 ? `${tuer.anzahl} Gegner · je ` : ''}${tuer.hp} HP`
                           : 'Unbekannt'}
                       </p>
                     </div>

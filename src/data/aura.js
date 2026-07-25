@@ -34,14 +34,14 @@ export function auraStage(aura, level) {
   return stage
 }
 
-// Wirkung gestaffelt nach Rangverhältnis:
-// voll unter eigenem Rang, halb bei gleichem Rang, null gegen Bosse darüber
-export function auraDamageBonus(aura, level, ownRank, enemyRank, isBoss = false) {
+// Wirkung gestaffelt nach Rangverhältnis: voller Bonus unter dem eigenen
+// Rang, halber bei gleichem Rang, keiner darüber – egal ob Boss oder nicht.
+export function auraDamageBonus(aura, level, ownRank, enemyRank) {
   const { bonus } = auraStage(aura, level)
   if (!bonus) return 0
   const own = RANKS.indexOf(ownRank)
   const enemy = RANKS.indexOf(enemyRank ?? ownRank)
   if (enemy < own) return bonus
   if (enemy === own) return bonus / 2
-  return isBoss ? 0 : bonus / 2
+  return 0
 }

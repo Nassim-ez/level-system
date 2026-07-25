@@ -411,32 +411,6 @@ function reducer(state, action) {
       if (!state.unlockedTitles.includes(action.id)) return state
       return { ...state, title: TITLES[action.id].name }
     }
-    case 'DUNGEON_DEATH': {
-      // Niederlage: Aura erlischt, Fortschritt verfällt, Tor öffnet sich
-      const dungeon = findDungeon(state.dungeon.run)
-      let log = withLog(state.log, 'Deine Aura ist erloschen', {
-        detail: 'Im Dungeon gefallen',
-      })
-      if (dungeon) {
-        log = withLog(log, `${dungeon.name} gescheitert`, {
-          detail: 'Fortschritt verloren',
-        })
-      }
-      return {
-        ...state,
-        aura: 0,
-        dungeon: {
-          ...state.dungeon,
-          run: null,
-          door: 0,
-          progress: {},
-          inside: false,
-          enemyHp: null,
-          killed: 0,
-        },
-        log,
-      }
-    }
     case 'DUNGEON_SELECT': {
       // Dungeon auswählen (Türkarte ansehen) – nur außerhalb eines Laufs
       if (state.dungeon.inside) return state

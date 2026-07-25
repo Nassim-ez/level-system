@@ -39,135 +39,226 @@ h4 {
   font-family: 'Orbitron', sans-serif;
 }
 
-/* --- Dungeon-Kampf --- */
-@keyframes fight-idle {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
+/* --- Dungeon-Kampf: Animationen 1:1 aus dungeon-mockup.html --- */
+#pfig {
+  transform-origin: 50% 90%;
+  animation: breathe 3.6s ease-in-out infinite;
+}
+#efig {
+  transform-origin: 50% 90%;
+  animation: breathe 3.2s ease-in-out infinite;
+}
+@keyframes breathe {
   50% {
-    transform: translateY(-4px);
+    transform: translateY(-4px) scale(1.012);
   }
 }
-
-@keyframes fight-attack-right {
-  0% {
-    transform: translateX(0);
-  }
-  35% {
-    transform: translateX(18px) scale(1.05);
-  }
-  100% {
-    transform: translateX(0);
+#efig.rage {
+  animation: breathe 1.2s ease-in-out infinite;
+}
+#efig.flinch {
+  animation: flE 0.3s;
+}
+@keyframes flE {
+  30% {
+    transform: translate(9px, 4px) rotate(3deg);
   }
 }
-
-@keyframes fight-attack-left {
-  0% {
-    transform: translateX(0);
-  }
-  35% {
-    transform: translateX(-18px) scale(1.05);
-  }
-  100% {
-    transform: translateX(0);
-  }
+#efig.lunge {
+  animation: luE 0.5s;
 }
-
-@keyframes fight-hit {
-  0%,
-  100% {
-    transform: translateX(0);
-    filter: none;
-  }
-  20% {
-    transform: translateX(-6px);
-    filter: brightness(2.2) saturate(0.4);
-  }
+@keyframes luE {
   40% {
-    transform: translateX(5px);
-    filter: brightness(1.6);
-  }
-  60% {
-    transform: translateX(-3px);
+    transform: translateX(-24px) scale(1.1);
   }
 }
-
-@keyframes fight-die {
-  0% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(14px) scale(0.85);
-  }
+#efig.die {
+  animation: dyE 1.1s forwards;
 }
-
-@keyframes fight-flash {
-  0%,
-  100% {
+@keyframes dyE {
+  to {
+    transform: translateY(26px) rotate(14deg) scale(0.85);
     opacity: 0;
   }
-  50% {
-    opacity: 0.5;
+}
+#pfig.strike {
+  animation: st 0.4s;
+}
+@keyframes st {
+  40% {
+    transform: translateX(20px) scale(1.06);
   }
 }
-
-@keyframes aura-ring {
-  0%,
-  100% {
-    box-shadow: 0 0 12px rgba(143, 224, 255, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 26px rgba(143, 224, 255, 0.8);
+#pfig.hurt {
+  animation: hu 0.35s;
+}
+@keyframes hu {
+  30% {
+    transform: translate(-12px, 3px) rotate(-4deg);
   }
 }
-
-@keyframes warn-blink {
-  0%,
-  100% {
-    opacity: 1;
+#pfig.brace {
+  animation: br 0.5s;
+}
+@keyframes br {
+  50% {
+    transform: translateY(8px) scale(0.94);
   }
+}
+.eye {
+  animation: blink 4s infinite;
+}
+@keyframes blink {
+  48%,
+  52% {
+    opacity: 0.25;
+  }
+}
+.aura,
+.auraring {
+  transform-origin: center;
+  animation: spin 20s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.glowline {
+  animation: pul 2.6s ease-in-out infinite;
+}
+@keyframes pul {
   50% {
     opacity: 0.35;
   }
 }
-
-@keyframes float-up {
-  0% {
-    opacity: 1;
-    transform: translate(-50%, 0);
+.arena-shake {
+  animation: shk 0.3s;
+}
+@keyframes shk {
+  20% {
+    transform: translate(-6px, 2px);
   }
-  100% {
+  60% {
+    transform: translate(5px, -2px);
+  }
+}
+.dmgnum {
+  position: absolute;
+  top: 12%;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 21px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 12px var(--danger);
+  pointer-events: none;
+  animation: fly 1s ease-out forwards;
+  z-index: 4;
+  transform: translateX(-50%);
+}
+@keyframes fly {
+  to {
+    transform: translate(-50%, -52px);
     opacity: 0;
-    transform: translate(-50%, -38px);
+  }
+}
+.dmgnum.crit {
+  color: var(--ok);
+  text-shadow: 0 0 14px var(--ok);
+}
+.dmgnum.miss {
+  color: var(--dim);
+  text-shadow: none;
+  font-size: 14px;
+}
+.roar {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  letter-spacing: 4px;
+  color: var(--danger);
+  text-shadow: 0 0 20px var(--danger);
+  pointer-events: none;
+  animation: rr 1.4s ease-out forwards;
+  z-index: 5;
+}
+@keyframes rr {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  25% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+.slam {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 26% 55%,
+    rgba(255, 77, 94, 0.5),
+    rgba(255, 77, 94, 0.12) 55%,
+    transparent
+  );
+  pointer-events: none;
+  animation: sl 0.6s forwards;
+  z-index: 5;
+}
+@keyframes sl {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.blog-line {
+  opacity: 0;
+  animation: app 0.3s forwards;
+}
+@keyframes app {
+  to {
+    opacity: 1;
+  }
+}
+.tele-now {
+  animation: tp 0.7s infinite;
+}
+@keyframes tp {
+  50% {
+    opacity: 0.4;
   }
 }
 
-.fight-idle {
-  animation: fight-idle 2.6s ease-in-out infinite;
+.tag-w,
+.tag-r {
+  display: inline-block;
+  font-size: 12px;
+  border-radius: 8px;
+  padding: 2px 9px;
+  margin: 3px 5px 0 0;
+  border: 1px solid;
 }
-.fight-attack-right {
-  animation: fight-attack-right 0.45s ease-out;
+.tag-w {
+  color: var(--ok);
+  border-color: rgba(77, 255, 166, 0.5);
+  background: rgba(77, 255, 166, 0.08);
 }
-.fight-attack-left {
-  animation: fight-attack-left 0.45s ease-out;
-}
-.fight-hit {
-  animation: fight-hit 0.4s ease-out;
-}
-.fight-die {
-  animation: fight-die 0.6s ease-in forwards;
-}
-.aura-ring {
-  animation: aura-ring 2.4s ease-in-out infinite;
-}
-.warn-blink {
-  animation: warn-blink 0.9s ease-in-out infinite;
-}
-.float-up {
-  animation: float-up 1s ease-out forwards;
+.tag-r {
+  color: var(--danger);
+  border-color: rgba(255, 77, 94, 0.5);
+  background: rgba(255, 77, 94, 0.08);
 }
 
 @keyframes rank-pulse {
