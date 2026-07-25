@@ -20,12 +20,24 @@ import {
   gegnerSchaden,
   moodIndex,
   MOODS,
+  AMBER,
+  BELASTUNG_FARBEN,
   COMBO_MAX,
   FLUCH_CHANCE,
   FLUCH_DAUER,
 } from '../data/combat.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
+
+// Aufsteigende Staubpartikel – links blau (eigene Seite), rechts rot
+const STAUB = [
+  { left: '14%', dauer: 7.5, delay: 0, farbe: 'rgba(63,182,255,.55)' },
+  { left: '27%', dauer: 9.2, delay: 2.4, farbe: 'rgba(143,224,255,.45)' },
+  { left: '38%', dauer: 8.1, delay: 4.1, farbe: 'rgba(63,182,255,.35)' },
+  { left: '62%', dauer: 8.6, delay: 1.2, farbe: 'rgba(255,77,94,.45)' },
+  { left: '74%', dauer: 7.1, delay: 3.3, farbe: 'rgba(255,77,94,.55)' },
+  { left: '86%', dauer: 9.8, delay: 5.2, farbe: 'rgba(255,107,120,.35)' },
+]
 
 function neuerKampf(tuer) {
   return {
@@ -339,8 +351,13 @@ function DungeonFight({ onExit }) {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex flex-col"
-      style={{ height: '100dvh', background: 'var(--bg)', padding: '10px 12px 12px' }}
+      className="fixed inset-0 z-40 mx-auto flex flex-col overflow-hidden"
+      style={{
+        height: '100dvh',
+        maxWidth: 430,
+        background: 'var(--bg)',
+        padding: '10px 12px 12px',
+      }}
     >
       {/* Kopfzeile */}
       <div className="flex shrink-0 items-center gap-2 px-0.5 pb-2">
@@ -400,7 +417,7 @@ function DungeonFight({ onExit }) {
               name="player"
               id="pfig"
               className={`w-full ${pAnim}`}
-              style={{ height: 'min(34vh, 140px)' }}
+              style={{ height: 'min(38vh, 168px)' }}
             />
             <div className="mt-0.5 text-center">
               <div style={{ ...orbitron, fontSize: '12px', fontWeight: 900, color: 'var(--glow)' }}>
@@ -414,9 +431,9 @@ function DungeonFight({ onExit }) {
               farbe={
                 k.vitalitaet <= MAX_VITALITAET * 0.3
                   ? 'linear-gradient(90deg,#8b1a28,#ff4d5e)'
-                  : 'linear-gradient(90deg,#1e7f52,#4dffa6)'
+                  : 'linear-gradient(90deg,#2e7fd4,#8fe0ff)'
               }
-              glow="0 0 9px rgba(77,255,166,.4)"
+              glow="0 0 9px rgba(63,182,255,.4)"
             />
             <div style={{ ...orbitron, fontSize: '8.5px', color: 'var(--dim)', marginTop: 3 }}>
               {k.vitalitaet} / {MAX_VITALITAET} VIT
@@ -444,7 +461,7 @@ function DungeonFight({ onExit }) {
               name={tuer.sprite}
               id="efig"
               className={`w-full ${eAnim} ${mi === 3 && !kampfVorbei ? 'rage' : ''}`}
-              style={{ height: 'min(34vh, 140px)' }}
+              style={{ height: 'min(38vh, 168px)' }}
             />
             <div className="mt-0.5 text-center">
               <div style={{ ...orbitron, fontSize: '12px', fontWeight: 900 }}>
@@ -494,6 +511,20 @@ function DungeonFight({ onExit }) {
           </div>
         </div>
 
+        {/* Aufsteigender Staub */}
+        {STAUB.map((d, i) => (
+          <span
+            key={i}
+            className="dust"
+            style={{
+              left: d.left,
+              background: d.farbe,
+              animationDuration: `${d.dauer}s`,
+              animationDelay: `${d.delay}s`,
+            }}
+          />
+        ))}
+
         {/* Schadenszahlen */}
         {flies.map((f) => (
           <div
@@ -521,7 +552,7 @@ function DungeonFight({ onExit }) {
                     : z.art === 'bad'
                       ? 'var(--danger)'
                       : z.art === 'good'
-                        ? 'var(--ok)'
+                        ? 'var(--xp)'
                         : 'var(--dim)',
               }}
             >
@@ -534,21 +565,21 @@ function DungeonFight({ onExit }) {
       {/* Belastung + Aura */}
       <div className="shrink-0 pt-[7px]">
         <div className="grid grid-cols-2 gap-[9px]">
-          <div>
-            <b style={{ ...orbitron, fontSize: '8px', letterSpacing: '1.5px', color: 'var(--dim)', display: 'block', marginBottom: 3 }}>
+          <div className="min-w-0">
+            <b className="block truncate" style={{ ...orbitron, fontSize: '8px', letterSpacing: '1.5px', color: 'var(--dim)', marginBottom: 3 }}>
               BELASTUNG {k.belastung} · {BELASTUNG_LABELS[stufe]}
             </b>
             <div
               className="flex overflow-hidden rounded-lg border"
               style={{ height: 8, background: '#0c1420', borderColor: 'var(--line)' }}
             >
-              <i style={{ width: `${Math.min(k.belastung, 100) / 3}%`, background: 'var(--ok)', transition: 'width .35s' }} />
-              <i style={{ width: `${Math.min(Math.max(k.belastung - 100, 0), 100) / 3}%`, background: '#ffd95e', transition: 'width .35s' }} />
-              <i style={{ width: `${Math.min(Math.max(k.belastung - 200, 0), 100) / 3}%`, background: '#ff9440', transition: 'width .35s' }} />
+              <i style={{ width: `${Math.min(k.belastung, 100) / 3}%`, background: BELASTUNG_FARBEN[0], transition: 'width .35s' }} />
+              <i style={{ width: `${Math.min(Math.max(k.belastung - 100, 0), 100) / 3}%`, background: BELASTUNG_FARBEN[1], transition: 'width .35s' }} />
+              <i style={{ width: `${Math.min(Math.max(k.belastung - 200, 0), 100) / 3}%`, background: BELASTUNG_FARBEN[2], transition: 'width .35s' }} />
             </div>
           </div>
-          <div>
-            <b style={{ ...orbitron, fontSize: '8px', letterSpacing: '1.5px', color: 'var(--dim)', display: 'block', marginBottom: 3 }}>
+          <div className="min-w-0">
+            <b className="block truncate" style={{ ...orbitron, fontSize: '8px', letterSpacing: '1.5px', color: 'var(--dim)', marginBottom: 3 }}>
               AURA {state.aura} · {auraStufe.name.toUpperCase()}
             </b>
             <div
@@ -573,7 +604,7 @@ function DungeonFight({ onExit }) {
           style={{
             marginTop: 6,
             fontSize: '11.5px',
-            color: gleichAngriff ? 'var(--danger)' : '#ffd95e',
+            color: gleichAngriff ? 'var(--danger)' : AMBER,
           }}
         >
           {gleichAngriff
@@ -583,7 +614,7 @@ function DungeonFight({ onExit }) {
       </div>
 
       {/* Angriffe */}
-      <div className="grid shrink-0 grid-cols-2 gap-1.5" style={{ marginTop: 6 }}>
+      <div className="grid shrink-0 grid-cols-3 gap-1.5" style={{ marginTop: 6 }}>
         {ANGRIFFE.map((a) => {
           const art = ARTEN[a.art]
           const schwach = tuer.schwaechen?.[a.art] > 1
@@ -593,31 +624,31 @@ function DungeonFight({ onExit }) {
               key={a.id}
               type="button"
               onClick={() => angreifen(a)}
-              className="text-left"
+              className="min-w-0 text-center"
               style={{
-                border: `1px solid ${schwach ? 'var(--ok)' : 'var(--glow)'}`,
+                border: `1px solid ${schwach ? 'var(--xp)' : 'rgba(63,182,255,.6)'}`,
                 background: 'rgba(63,182,255,.08)',
                 color: 'var(--text)',
-                borderRadius: '10px',
-                padding: '7px 8px',
-                fontSize: '13.5px',
+                borderRadius: '9px',
+                padding: '6px 4px',
+                fontSize: '11.5px',
                 fontWeight: 600,
-                lineHeight: 1.1,
-                opacity: resist ? 0.6 : 1,
+                lineHeight: 1.15,
+                opacity: resist ? 0.55 : 1,
               }}
             >
-              {a.name}
+              <span className="block truncate">{a.name}</span>
               <small
                 style={{
                   ...orbitron,
                   display: 'block',
-                  fontSize: '7px',
-                  letterSpacing: '1px',
-                  color: schwach ? 'var(--ok)' : art.color,
+                  fontSize: '6.5px',
+                  letterSpacing: '.5px',
+                  color: schwach ? 'var(--xp)' : art.color,
                   marginTop: 1,
                 }}
               >
-                {a.einheit} · {art.name.toUpperCase()}
+                {a.einheit}
                 {schwach ? ' ▲' : resist ? ' ▼' : ''}
               </small>
             </button>
@@ -630,16 +661,16 @@ function DungeonFight({ onExit }) {
         <button
           type="button"
           onClick={blocken}
-          className="text-left"
+          className="text-center"
           style={{
-            border: '1px solid var(--ok)',
-            background: 'rgba(77,255,166,.07)',
+            border: '1px solid rgba(63,182,255,.4)',
+            background: 'rgba(63,182,255,.04)',
             color: 'var(--text)',
-            borderRadius: '10px',
-            padding: '7px 6px',
-            fontSize: '12.5px',
+            borderRadius: '9px',
+            padding: '6px 6px',
+            fontSize: '12px',
             fontWeight: 600,
-            lineHeight: 1.1,
+            lineHeight: 1.15,
           }}
         >
           Plank
@@ -651,16 +682,16 @@ function DungeonFight({ onExit }) {
           type="button"
           onClick={heilen}
           disabled={k.heilungen <= 0}
-          className="text-left disabled:opacity-40"
+          className="text-center disabled:opacity-40"
           style={{
-            border: '1px solid var(--ok)',
-            background: 'rgba(77,255,166,.07)',
+            border: '1px solid rgba(63,182,255,.4)',
+            background: 'rgba(63,182,255,.04)',
             color: 'var(--text)',
-            borderRadius: '10px',
-            padding: '7px 6px',
-            fontSize: '12.5px',
+            borderRadius: '9px',
+            padding: '6px 6px',
+            fontSize: '12px',
             fontWeight: 600,
-            lineHeight: 1.1,
+            lineHeight: 1.15,
           }}
         >
           Dehnen
@@ -720,7 +751,7 @@ function DungeonFight({ onExit }) {
             </b>
             <p style={{ fontSize: '12px', color: 'var(--dim)', marginTop: 4 }}>
               Blockchance <span style={{ color: 'var(--glow)' }}>{Math.round(blockChance(tuer) * 100)}%</span> ·
-              Heilungen: <span style={{ color: 'var(--ok)' }}>{k.heilungen}</span> ·
+              Heilungen: <span style={{ color: 'var(--xp)' }}>{k.heilungen}</span> ·
               Einschüchterung: <span style={{ color: 'var(--xp)' }}>+{auraBonus}%</span>
             </p>
             <b style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px', color: 'var(--dim)', display: 'block', marginTop: 12 }}>
@@ -762,8 +793,8 @@ function DungeonFight({ onExit }) {
             className="w-full max-w-[340px] rounded-2xl p-[22px] text-center"
             style={{
               background: 'var(--panel)',
-              border: `1px solid ${popup.art === 'sieg' ? 'var(--ok)' : 'var(--danger)'}`,
-              boxShadow: `0 0 40px ${popup.art === 'sieg' ? 'rgba(77,255,166,.3)' : 'rgba(255,77,94,.3)'}`,
+              border: `1px solid ${popup.art === 'sieg' ? 'var(--glow)' : 'var(--danger)'}`,
+              boxShadow: `0 0 40px ${popup.art === 'sieg' ? 'rgba(63,182,255,.3)' : 'rgba(255,77,94,.3)'}`,
             }}
           >
             <div style={{ fontSize: 36 }}>
@@ -774,7 +805,7 @@ function DungeonFight({ onExit }) {
                 ...orbitron,
                 fontSize: '15px',
                 letterSpacing: '3px',
-                color: popup.art === 'sieg' ? 'var(--ok)' : 'var(--danger)',
+                color: popup.art === 'sieg' ? 'var(--glow)' : 'var(--danger)',
                 margin: '6px 0 10px',
               }}
             >
@@ -848,8 +879,8 @@ function DungeonFight({ onExit }) {
                 ...orbitron,
                 letterSpacing: '2px',
                 fontSize: '11px',
-                color: popup.art === 'sieg' ? 'var(--ok)' : 'var(--danger)',
-                border: `1px solid ${popup.art === 'sieg' ? 'var(--ok)' : 'var(--danger)'}`,
+                color: popup.art === 'sieg' ? 'var(--glow)' : 'var(--danger)',
+                border: `1px solid ${popup.art === 'sieg' ? 'var(--glow)' : 'var(--danger)'}`,
                 borderRadius: '11px',
                 padding: 11,
               }}

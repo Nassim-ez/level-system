@@ -5,11 +5,12 @@
 //   – Einschüchterungsbonus aus der Aura
 // ---------------------------------------------------------------------------
 
+// Eigene Aktionen sind durchgehend blau; Rot bleibt dem Gegner vorbehalten.
 export const ARTEN = {
-  kraft: { id: 'kraft', name: 'Kraft', color: 'var(--danger)' },
+  kraft: { id: 'kraft', name: 'Kraft', color: 'var(--glow)' },
   core: { id: 'core', name: 'Core', color: 'var(--xp)' },
-  ausdauer: { id: 'ausdauer', name: 'Ausdauer', color: 'var(--ok)' },
-  tempo: { id: 'tempo', name: 'Tempo', color: 'var(--glow)' },
+  ausdauer: { id: 'ausdauer', name: 'Ausdauer', color: '#6fa8dc' },
+  tempo: { id: 'tempo', name: 'Tempo', color: '#5ecbff' },
 }
 
 // Die sechs Angriffe wie im Mockup. basis = Schaden vor allen Multiplikatoren,
@@ -19,7 +20,7 @@ export const ANGRIFFE = [
   { id: 'kniebeugen', name: 'Kniebeugen', art: 'kraft', menge: 5, einheit: '+5', basis: 5 },
   { id: 'klimmzuege', name: 'Klimmzüge', art: 'kraft', menge: 1, einheit: '+1 ×5', basis: 5 },
   { id: 'crunches', name: 'Crunches', art: 'core', menge: 5, einheit: '+5', basis: 5 },
-  { id: 'schattenboxen', name: 'Schattenboxen', art: 'ausdauer', menge: 1, einheit: '+1 MIN ×8', basis: 8 },
+  { id: 'knielauf', name: 'Knielauf', art: 'ausdauer', menge: 20, einheit: '+20 ×0,5', basis: 10 },
   { id: 'burpees', name: 'Burpees', art: 'tempo', menge: 5, einheit: '+5 ×3', basis: 15 },
 ]
 
@@ -73,13 +74,19 @@ export const FLUCH_CHANCE = 0.4
 export const FLUCH_DAUER = 3
 export const FLUCH_FAKTOR = 0.7
 
-// Stimmungen nach HP-Anteil
+// Amber ist ausschließlich der Angriffs-Ankündigung vorbehalten
+export const AMBER = '#ffb347'
+
+// Stimmungen nach HP-Anteil – Rot-Skala, kein Gelb/Orange
 export const MOODS = [
   ['GELASSEN', '#6f8db0'],
-  ['GEREIZT', '#ffd95e'],
-  ['WÜTEND', '#ff9440'],
+  ['GEREIZT', '#e08a95'],
+  ['WÜTEND', '#ff6b78'],
   ['RASEND', '#ff4d5e'],
 ]
+
+// Belastungsleiste: blau → amber → rot
+export const BELASTUNG_FARBEN = ['#3fb6ff', AMBER, '#ff4d5e']
 
 export function moodIndex(hp, maxHp) {
   const pct = hp / maxHp
