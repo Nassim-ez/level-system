@@ -4,7 +4,8 @@ import {
   requiredQuestIds,
   todayKey,
   POOL_XP,
-  QUESTS,
+  raiseTargets,
+  resolveQuest,
 } from '../data/quests.js'
 import { CLASSES } from '../data/classes.js'
 import { TITLES } from '../data/titles.js'
@@ -46,7 +47,14 @@ const initialState = {
   gender: null,
   onboarded: false,
   unlockedTitles: ['neuling'],
-  lifetime: { liegestuetze: 0, dungeons: 0, bestStreak: 0 },
+  lifetime: { liegestuetze: 0, klimmzuege: 0, dungeons: 0, bestStreak: 0 },
+  baseTargets: {
+    liegestuetze: 20,
+    kniebeugen: 30,
+    crunches: 25,
+    klimmzuege: 3,
+    dehnen: 10,
+  },
   dungeonOpen: false,
   dungeonRank: null,
   dungeonHp: null,
@@ -227,14 +235,14 @@ function reducer(state, action) {
           ),
         }
       }
-      if (action.id === 'liegestuetze') {
+      // Lifetime-Zähler füttern (Negativ-Klimmzüge zählen nicht als echte)
+      if (action.id === 'liegestuetze' || action.id === 'klimmzuege') {
+        const geleistet = state.baseTargets?.[action.id] ?? 0
         next = {
           ...next,
           lifetime: {
             ...next.lifetime,
-            liegestuetze:
-              next.lifetime.liegestuetze +
-              QUESTS.liegestuetze.reps[state.rank],
+            [action.id]: (next.lifetime[action.id] ?? 0) + geleistet,
           },
         }
       }
@@ -282,6 +290,7 @@ function reducer(state, action) {
         name: action.name?.trim() || state.name,
         gender: action.gender ?? state.gender,
         rank: action.rank,
+        baseTargets: action.baseTargets ?? state.baseTargets,
         level,
         xp: 0,
         xpGoal,
@@ -339,10 +348,13 @@ function reducer(state, action) {
         return state
       }
       let lifetime = state.lifetime
-      if (action.quest === 'liegestuetze' && action.reps > 0) {
+      if (
+        (action.quest === 'liegestuetze' || action.quest === 'klimmzuege') &&
+        action.reps > 0
+      ) {
         lifetime = {
           ...lifetime,
-          liegestuetze: lifetime.liegestuetze + action.reps,
+          [action.quest]: (lifetime[action.quest] ?? 0) + action.reps,
         }
       }
       const hp = Math.max(0, state.dungeonHp - action.amount)
@@ -376,8 +388,14 @@ function reducer(state, action) {
       const rankTest = { ...prev, [action.taskId]: value }
       let lifetime = state.lifetime
       const added = value - (prev[action.taskId] ?? 0)
-      if (action.taskId === 'liegestuetze' && added > 0) {
-        lifetime = { ...lifetime, liegestuetze: lifetime.liegestuetze + added }
+      if (
+        (action.taskId === 'liegestuetze' || action.taskId === 'klimmzuege') &&
+        added > 0
+      ) {
+        lifetime = {
+          ...lifetime,
+          [action.taskId]: (lifetime[action.taskId] ?? 0) + added,
+        }
       }
       const passed = test.tasks.every((t) => (rankTest[t.quest] ?? 0) >= t.ziel)
       if (!passed) {
@@ -391,8 +409,10 @@ function reducer(state, action) {
       const newRank = nextRank(state.rank)
       const after = nextRank(newRank)
       const stillActive = !!after && state.level >= RANK_THRESHOLDS[after]
+      // Alle Tagesziele um 15 % anheben
+      const baseTargets = raiseTargets(state.baseTargets)
       let log = withLog(state.log, `Rang ${newRank} erreicht`, {
-        detail: 'Aufstiegsprüfung bestanden',
+        detail: 'Aufstiegsprüfung bestanden · Tagesziele +15 %',
       })
       log = withLog(log, `${ITEMS[test.reward].name} erhalten`, {
         detail: 'Belohnung',
@@ -402,6 +422,7 @@ function reducer(state, action) {
         rank: newRank,
         rankTestActive: stillActive,
         lifetime,
+        baseTargets,
         inventory: [...state.inventory, test.reward],
         questProgress: { ...state.questProgress, rankTest: {} },
         log,

@@ -4,11 +4,13 @@ import { useGame } from '../context/GameContext.jsx'
 import {
   QUESTS,
   DAY_PLANS,
+  BONUS_PLANS,
   DAY_LABELS,
   TABLETS_XP,
   POOL_XP,
   STEP_XP_PER_1000,
   stepXpMax,
+  resolveQuest,
 } from '../data/quests.js'
 import { RANK_TESTS, nextRank } from '../data/ranks.js'
 import { DUNGEONS, DUNGEON_XP, DUNGEON_EXERCISES } from '../data/dungeons.js'
@@ -16,7 +18,7 @@ import { ITEMS } from '../data/items.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
-function QuestRow({ name, target, stat, xp, done, onComplete }) {
+function QuestRow({ name, target, stat, xp, hinweis, done, onComplete }) {
   return (
     <div
       className="flex items-center justify-between gap-3 border p-3"
@@ -41,6 +43,9 @@ function QuestRow({ name, target, stat, xp, done, onComplete }) {
         <p style={{ ...orbitron, fontSize: '10px', color: 'var(--dim)', letterSpacing: '1px' }}>
           {stat} · +{xp} XP
         </p>
+        {hinweis && (
+          <p style={{ fontSize: '11px', color: 'var(--dim)' }}>{hinweis}</p>
+        )}
       </div>
       {done ? (
         <span
@@ -78,11 +83,12 @@ function QuestRow({ name, target, stat, xp, done, onComplete }) {
 
 function Quests() {
   const { state, dispatch } = useGame()
-  const { rank, dayType, doneToday, questProgress, drawnTask } = state
+  const { dayType, doneToday, questProgress, drawnTask } = state
   const [stepsInput, setStepsInput] = useState('')
   const [taskInput, setTaskInput] = useState('')
 
   const plan = DAY_PLANS[dayType] ?? []
+  const bonusPlan = BONUS_PLANS[dayType] ?? []
   const cap = stepXpMax(dayType)
   const stepsXp = questProgress.stepsXp ?? 0
   const loggedSteps = questProgress.steps ?? 0
@@ -288,19 +294,42 @@ function Quests() {
         )}
         <div className="flex flex-col gap-2">
           {plan.map((id) => {
-            const q = QUESTS[id]
+            const q = resolveQuest(id, state)
             return (
               <QuestRow
                 key={id}
                 name={q.name}
-                target={`${q.reps[rank]} ${q.unit}`}
+                target={`${q.ziel} ${q.unit}`}
                 stat={q.stat}
                 xp={q.xp}
-                done={doneToday.includes(id)}
+                done={doneToday.includes(q.id)}
                 onComplete={() =>
                   dispatch({
                     type: 'COMPLETE_QUEST',
-                    id,
+                    id: q.id,
+                    xp: q.xp,
+                    stat: q.stat,
+                    name: q.name,
+                  })
+                }
+              />
+            )
+          })}
+          {bonusPlan.map((id) => {
+            const q = resolveQuest(id, state)
+            return (
+              <QuestRow
+                key={q.id}
+                name={q.name}
+                target={`${q.ziel} ${q.unit}`}
+                stat={`BONUS · ${q.stat}`}
+                xp={q.xp}
+                hinweis={q.hinweis}
+                done={doneToday.includes(q.id)}
+                onComplete={() =>
+                  dispatch({
+                    type: 'COMPLETE_QUEST',
+                    id: q.id,
                     xp: q.xp,
                     stat: q.stat,
                     name: q.name,

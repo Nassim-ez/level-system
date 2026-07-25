@@ -5,7 +5,6 @@ export const QUESTS = {
     unit: 'Wdh.',
     stat: 'STR',
     xp: 60,
-    reps: { E: 20, D: 30, C: 40, B: 55, A: 70, S: 100 },
   },
   kniebeugen: {
     id: 'kniebeugen',
@@ -13,7 +12,6 @@ export const QUESTS = {
     unit: 'Wdh.',
     stat: 'STR',
     xp: 60,
-    reps: { E: 30, D: 40, C: 55, B: 70, A: 90, S: 120 },
   },
   crunches: {
     id: 'crunches',
@@ -21,7 +19,6 @@ export const QUESTS = {
     unit: 'Wdh.',
     stat: 'VIT',
     xp: 60,
-    reps: { E: 25, D: 35, C: 45, B: 60, A: 80, S: 100 },
   },
   dehnen: {
     id: 'dehnen',
@@ -29,7 +26,6 @@ export const QUESTS = {
     unit: 'Min.',
     stat: 'AGI',
     xp: 60,
-    reps: { E: 10, D: 10, C: 15, B: 15, A: 20, S: 20 },
   },
   klimmzuege: {
     id: 'klimmzuege',
@@ -37,7 +33,16 @@ export const QUESTS = {
     unit: 'Wdh.',
     stat: 'STR',
     xp: 60,
-    reps: { E: 3, D: 5, C: 8, B: 12, A: 15, S: 20 },
+  },
+  // Ersatz, solange noch keine echten Klimmzüge geschafft werden
+  negativklimmzuege: {
+    id: 'negativklimmzuege',
+    name: 'Negativ-Klimmzüge',
+    unit: 'Wdh.',
+    stat: 'STR',
+    xp: 60,
+    hinweis: 'Hochspringen, dann langsam ablassen',
+    festesZiel: 5,
   },
 }
 
@@ -45,6 +50,52 @@ export const DAY_PLANS = {
   A: ['liegestuetze', 'kniebeugen'],
   B: ['crunches', 'dehnen'],
   REST: [],
+}
+
+// Optionale Bonus-Quests je Tagestyp (zählen nicht zur Serien-Pflicht)
+export const BONUS_PLANS = {
+  A: ['klimmzuege'],
+  B: [],
+  REST: [],
+}
+
+// Startwerte der Tagesziele aus den Onboarding-Maximalwerten
+export const TARGET_FACTOR = 1.5 // Muskelübungen: etwas über dem Maximum
+export const RANK_UP_FACTOR = 1.15 // Steigerung pro Rang-Aufstieg
+
+export function targetsFromMaxima(maxima) {
+  // Muskelübungen mindestens 1 – Klimmzüge dürfen 0 bleiben,
+  // dann übernehmen die Negativ-Klimmzüge.
+  const ziel = (wert) => Math.max(1, Math.ceil((wert || 0) * TARGET_FACTOR))
+  return {
+    liegestuetze: ziel(maxima.liegestuetze),
+    kniebeugen: ziel(maxima.kniebeugen),
+    crunches: ziel(maxima.crunches),
+    klimmzuege: Math.ceil((maxima.klimmzuege || 0) * TARGET_FACTOR),
+    dehnen: Math.max(1, Math.round(maxima.dehnen || 0)),
+  }
+}
+
+export function raiseTargets(targets) {
+  const raised = {}
+  for (const [key, value] of Object.entries(targets)) {
+    raised[key] = Math.ceil(value * RANK_UP_FACTOR)
+  }
+  return raised
+}
+
+// Braucht noch Negativ-Klimmzüge? (noch nie echte Klimmzüge geloggt)
+export function needsNegatives(state) {
+  return (state.lifetime?.klimmzuege ?? 0) === 0
+}
+
+// Liefert die tatsächlich anzuzeigende Quest inkl. persönlichem Tagesziel
+export function resolveQuest(id, state) {
+  const useNegatives = id === 'klimmzuege' && needsNegatives(state)
+  const quest = useNegatives ? QUESTS.negativklimmzuege : QUESTS[id]
+  const ziel =
+    quest.festesZiel ?? state.baseTargets?.[quest.id] ?? 0
+  return { ...quest, ziel }
 }
 
 export const DAY_LABELS = {
@@ -70,6 +121,30 @@ export function stepXpMax(dayType) {
 
 export function requiredQuestIds(dayType) {
   return [...(DAY_PLANS[dayType] ?? []), 'tabletten']
+}
+
+// Referenzwerte für die Rang-Einstufung: Schwellen je Stufe 0–3
+const SCORE_THRESHOLDS = {
+  liegestuetze: [10, 25, 50],
+  kniebeugen: [15, 35, 60],
+  crunches: [15, 30, 50],
+  klimmzuege: [1, 5, 10],
+  dehnen: [5, 10, 20],
+}
+
+// Summe der relativen Leistung über alle Übungen → Rang E–B
+export function rankFromMaxima(maxima) {
+  let sum = 0
+  for (const [key, stufen] of Object.entries(SCORE_THRESHOLDS)) {
+    const value = maxima[key] || 0
+    sum += stufen.filter((schwelle) => value >= schwelle).length
+  }
+  // auf die 0–9-Skala normieren (5 Übungen × 3 Punkte = 15)
+  const score = Math.round((sum / 15) * 9)
+  if (score <= 2) return 'E'
+  if (score <= 5) return 'D'
+  if (score <= 7) return 'C'
+  return 'B'
 }
 
 export function todayKey(date = new Date()) {
