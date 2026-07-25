@@ -5,11 +5,11 @@ export const DUNGEON_XP = 200
 
 export const DUNGEONS = {
   E: { name: 'Eisenhöhle', gegner: 'Steingolem', hp: 300, drop: 'serienschutz' },
-  D: { name: 'Nebelwald', gegner: 'Schattenwolf', hp: 500, drop: 'trainingsguertel' },
-  C: { name: 'Verlassene Mine', gegner: 'Golemfürst', hp: 800, drop: 'jaegerhelm' },
-  B: { name: 'Frostgipfel', gegner: 'Eisriese', hp: 1200, drop: 'frostpanzer' },
-  A: { name: 'Dämonenturm', gegner: 'Wächter', hp: 1800, drop: 'daemonenklinge' },
-  S: { name: 'Thronsaal', gegner: 'Monarch der Leere', hp: 2500, drop: 'monarchenkrone' },
+  D: { name: 'Nebelwald', gegner: 'Schattenwolf', hp: 500, drop: 'trainingsguertel__grau' },
+  C: { name: 'Verlassene Mine', gegner: 'Golemfürst', hp: 800, drop: 'jaegerhelm__blau' },
+  B: { name: 'Frostgipfel', gegner: 'Eisriese', hp: 1200, drop: 'frostpanzer__blau' },
+  A: { name: 'Dämonenturm', gegner: 'Wächter', hp: 1800, drop: 'daemonenklinge__violett' },
+  S: { name: 'Thronsaal', gegner: 'Monarch der Leere', hp: 2500, drop: 'monarchenkrone__gold' },
 }
 
 // Schaden pro +5-Klick je Übung (Klimmzüge zählen 5-fach)
@@ -194,7 +194,7 @@ export const DUNGEON_RUNS = [
         boss: true,
       },
     ],
-    drop: 'trainingsguertel',
+    drop: 'trainingsguertel__grau',
   },
   {
     id: 'nebelwald',
@@ -278,7 +278,7 @@ export const DUNGEON_RUNS = [
         boss: true,
       },
     ],
-    drop: 'laeuferschuhe',
+    drop: 'laeuferschuhe__grau',
   },
 ]
 

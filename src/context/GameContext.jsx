@@ -12,7 +12,16 @@ import { TITLES } from '../data/titles.js'
 import { normalizeGender } from '../data/gender.js'
 import { auraGain } from '../data/aura.js'
 import { TUER_XP, RAST_GEGNER_HEILUNG } from '../data/combat.js'
-import { ITEMS } from '../data/items.js'
+import {
+  ITEMS,
+  herabgestuft,
+  hochgestuft,
+  naechsteStufe,
+  aufwertungKosten,
+  reparaturKosten,
+  kostenErfuellt,
+} from '../data/items.js'
+import { zieheDrops, materialName } from '../data/loot.js'
 import {
   RANK_THRESHOLDS,
   RANK_TESTS,
@@ -49,7 +58,7 @@ const initialState = {
     hose: null,
     schuhe: null,
   },
-  inventory: ['holzschwert', 'serienschutz'],
+  inventory: ['holzschwert__grau', 'serienschutz'],
   rankTestActive: false,
   rankTestTasks: null, // beim Freischalten eingefrorene Prüfungsziele
   aura: 0,
@@ -63,7 +72,8 @@ const initialState = {
     stones: 1,
     fight: null, // laufender Kampf, wird nach jedem Zug gespeichert
   },
-  itemDowngrades: {}, // durch Niederlagen herabgestufte Items
+  materials: { eisenstaub: 0, knochenmehl: 0, nebelessenz: 0 },
+  damagedItems: {}, // im Dungeon beschädigte Items (itemId → true)
   klasse: null,
   gender: null,
   onboarded: false,
@@ -83,26 +93,65 @@ const initialState = {
   log: [],
 }
 
+// Beute aus gezogenen Drops in Inventar bzw. Materialien einsortieren
+function verteileBeute(state, drops) {
+  let inventory = [...state.inventory]
+  let materials = { ...state.materials }
+  let log = state.log
+  for (const drop of drops ?? []) {
+    if (drop.art === 'material') {
+      materials[drop.material] = (materials[drop.material] ?? 0) + drop.menge
+      log = withLog(log, `${materialName(drop.material)} ×${drop.menge}`, {
+        detail: 'Materialien-Bündel',
+      })
+    } else {
+      inventory.push(drop.itemId)
+      const item = ITEMS[drop.itemId]
+      log = withLog(log, `${item?.name ?? drop.itemId} erhalten`, {
+        detail: drop.glueck
+          ? `Glücksfund · ${item?.stufe}`
+          : `Beute · ${item?.stufe}`,
+      })
+    }
+  }
+  return { inventory, materials, log }
+}
+
 function withLog(log, text, extra = {}) {
   return [{ datum: todayKey(), text, ...extra }, ...log].slice(0, 50)
 }
 
-// Herabgestufte Items verlieren pro Stufe ein Drittel ihres Bonus
-export function itemBonusWert(itemId, state) {
-  const bonus = ITEMS[itemId]?.bonus
-  if (!bonus) return 0
-  const stufen = state.itemDowngrades?.[itemId] ?? 0
-  if (!stufen) return bonus.wert
-  return Math.max(1, Math.round(bonus.wert * Math.pow(2 / 3, stufen)))
+// Effektive Stats: Basis plus Item-Boni minus Debuffs
+export function effectiveStats(state) {
+  const stats = { ...state.stats }
+  for (const itemId of Object.values(state.equipment)) {
+    const item = ITEMS[itemId]
+    if (!item) continue
+    if (item.bonus?.typ === 'stat' && item.bonus.stat) {
+      stats[item.bonus.stat] = (stats[item.bonus.stat] ?? 0) + item.bonus.wert
+    }
+    if (item.debuff?.typ === 'stat' && item.debuff.stat) {
+      stats[item.debuff.stat] = Math.max(
+        0,
+        (stats[item.debuff.stat] ?? 0) - item.debuff.wert,
+      )
+    }
+  }
+  return stats
 }
 
 function xpMultiplier(state, stat) {
   let pct = 0
   for (const itemId of Object.values(state.equipment)) {
     if (!itemId) continue
-    const bonus = ITEMS[itemId]?.bonus
+    const item = ITEMS[itemId]
+    const bonus = item?.bonus
     if (bonus?.typ === 'xp' && (!bonus.stat || bonus.stat === stat)) {
-      pct += itemBonusWert(itemId, state)
+      pct += bonus.wert
+    }
+    const debuff = item?.debuff
+    if (debuff?.typ === 'xp' && (!debuff.stat || debuff.stat === stat)) {
+      pct -= debuff.wert
     }
   }
   const klasse = state.klasse ? CLASSES[state.klasse] : null
@@ -438,9 +487,15 @@ function reducer(state, action) {
       if (!tuer || !state.dungeon.inside) return state
       const progress = { ...state.dungeon.progress, [tuer.nr]: true }
       const killed = state.dungeon.killed + tuer.anzahl
+      // Beute: eine Tür gibt einen Drop, der Boss zwei
+      const drops = action.drops ?? zieheDrops(dungeon.id, state.rank, tuer.boss ? 2 : 1)
+      const beute = verteileBeute(state, drops)
+
       if (!tuer.boss) {
         let next = {
           ...state,
+          inventory: beute.inventory,
+          materials: beute.materials,
           dungeon: {
             ...state.dungeon,
             progress,
@@ -449,7 +504,7 @@ function reducer(state, action) {
             enemyHp: null,
             fight: null,
           },
-          log: withLog(state.log, `Tür ${tuer.nr} geschafft`, {
+          log: withLog(beute.log, `Tür ${tuer.nr} geschafft`, {
             detail: `${tuer.name} · ${tuer.anzahl}× ${tuer.gegnerart}`,
             xp: TUER_XP,
           }),
@@ -457,13 +512,10 @@ function reducer(state, action) {
         next = reducer(next, { type: 'ADD_XP', amount: TUER_XP })
         return next
       }
-      // Bosssieg: Tor öffnet sich, Beute und XP
-      let log = withLog(state.log, `${dungeon.boss} besiegt`, {
+      // Bosssieg: Tor öffnet sich, doppelte Beute und XP
+      const log = withLog(beute.log, `${dungeon.boss} besiegt`, {
         detail: `${dungeon.name} abgeschlossen`,
         xp: DUNGEON_XP,
-      })
-      log = withLog(log, `${ITEMS[dungeon.drop].name} erhalten`, {
-        detail: 'Dungeon-Beute',
       })
       let next = {
         ...state,
@@ -477,7 +529,8 @@ function reducer(state, action) {
           killed: 0,
           fight: null,
         },
-        inventory: [...state.inventory, dungeon.drop],
+        inventory: beute.inventory,
+        materials: beute.materials,
         lifetime: {
           ...state.lifetime,
           dungeons: (state.lifetime.dungeons ?? 0) + 1,
@@ -486,6 +539,89 @@ function reducer(state, action) {
       }
       next = reducer(next, { type: 'ADD_XP', amount: DUNGEON_XP })
       return next
+    }
+    case 'UPGRADE_ITEM': {
+      // Genau eine Stufe hoch, kein Überspringen
+      const item = ITEMS[action.itemId]
+      const ziel = hochgestuft(action.itemId)
+      if (!item || !ziel) return state
+      const kosten = aufwertungKosten(ITEMS[ziel].stufe)
+      if (!kostenErfuellt(kosten, state.materials)) return state
+      const materials = { ...state.materials }
+      for (const [mat, menge] of Object.entries(kosten)) materials[mat] -= menge
+
+      // Item entweder im Inventar oder am Körper ersetzen
+      let inventory = [...state.inventory]
+      let equipment = { ...state.equipment }
+      const idx = inventory.indexOf(action.itemId)
+      if (idx >= 0) {
+        inventory[idx] = ziel
+      } else {
+        const slot = Object.keys(equipment).find(
+          (s) => equipment[s] === action.itemId,
+        )
+        if (!slot) return state
+        equipment[slot] = ziel
+      }
+      const damagedItems = { ...state.damagedItems }
+      delete damagedItems[action.itemId]
+      return {
+        ...state,
+        materials,
+        inventory,
+        equipment,
+        damagedItems,
+        log: withLog(state.log, `${item.name} aufgewertet`, {
+          detail: `${item.stufe} → ${ITEMS[ziel].stufe}`,
+        }),
+      }
+    }
+    case 'REPAIR_ITEM': {
+      // Beschädigtes Item wiederherstellen – günstiger als Aufwerten
+      const item = ITEMS[action.itemId]
+      if (!item || !state.damagedItems?.[action.itemId]) return state
+      const ziel = hochgestuft(action.itemId)
+      const zielStufe = ziel ? ITEMS[ziel].stufe : null
+      const kosten = zielStufe ? reparaturKosten(zielStufe) : null
+      // Grau beschädigt: nur Markierung entfernen, keine Kosten
+      if (!ziel) {
+        const damagedItems = { ...state.damagedItems }
+        delete damagedItems[action.itemId]
+        return {
+          ...state,
+          damagedItems,
+          log: withLog(state.log, `${item.name} instand gesetzt`, {
+            detail: 'Schaden behoben',
+          }),
+        }
+      }
+      if (!kostenErfuellt(kosten, state.materials)) return state
+      const materials = { ...state.materials }
+      for (const [mat, menge] of Object.entries(kosten)) materials[mat] -= menge
+      let inventory = [...state.inventory]
+      let equipment = { ...state.equipment }
+      const idx = inventory.indexOf(action.itemId)
+      if (idx >= 0) {
+        inventory[idx] = ziel
+      } else {
+        const slot = Object.keys(equipment).find(
+          (s) => equipment[s] === action.itemId,
+        )
+        if (!slot) return state
+        equipment[slot] = ziel
+      }
+      const damagedItems = { ...state.damagedItems }
+      delete damagedItems[action.itemId]
+      return {
+        ...state,
+        materials,
+        inventory,
+        equipment,
+        damagedItems,
+        log: withLog(state.log, `${item.name} wiederhergestellt`, {
+          detail: `${item.stufe} → ${zielStufe}`,
+        }),
+      }
     }
     case 'DUNGEON_FIGHT_SYNC': {
       // Kampfzustand nach jedem Zug sichern
@@ -518,23 +654,36 @@ function reducer(state, action) {
     }
     case 'DUNGEON_DEFEAT': {
       // Niederlage: Aura erlischt, Fortschritt weg, ein getragenes Item leidet
-      const getragene = Object.values(state.equipment).filter(Boolean)
-      let itemDowngrades = state.itemDowngrades
-      let downgraded = null
+      const getragene = Object.entries(state.equipment).filter(([, id]) => id)
+      let equipment = state.equipment
+      let damagedItems = state.damagedItems
+      let beschaedigt = null
       if (getragene.length > 0) {
-        downgraded = getragene[Math.floor(Math.random() * getragene.length)]
-        itemDowngrades = {
-          ...itemDowngrades,
-          [downgraded]: (itemDowngrades[downgraded] ?? 0) + 1,
+        const [slot, itemId] =
+          getragene[Math.floor(Math.random() * getragene.length)]
+        const schlechter = herabgestuft(itemId)
+        if (schlechter) {
+          // Eine Qualitätsstufe herunter, grau bleibt grau
+          equipment = { ...equipment, [slot]: schlechter }
+          damagedItems = { ...damagedItems, [schlechter]: true }
+          beschaedigt = { alt: itemId, neu: schlechter }
+        } else {
+          damagedItems = { ...damagedItems, [itemId]: true }
+          beschaedigt = { alt: itemId, neu: itemId }
         }
       }
       const dungeon = findDungeon(state.dungeon.run)
       let log = withLog(state.log, 'Rückzug aus dem Dungeon', {
         detail: `${dungeon?.name ?? 'Dungeon'} · Fortschritt verloren`,
       })
-      if (downgraded) {
-        log = withLog(log, `${ITEMS[downgraded].name} herabgestuft`, {
-          detail: 'Im Kampf beschädigt',
+      if (beschaedigt) {
+        const alt = ITEMS[beschaedigt.alt]
+        const neu = ITEMS[beschaedigt.neu]
+        log = withLog(log, `${alt.name} beschädigt`, {
+          detail:
+            beschaedigt.alt === beschaedigt.neu
+              ? 'Bereits gewöhnlich – keine weitere Stufe'
+              : `${alt.stufe} → ${neu.stufe}`,
         })
       }
       log = withLog(log, 'Deine Aura ist erloschen', {
@@ -543,7 +692,8 @@ function reducer(state, action) {
       return {
         ...state,
         aura: 0,
-        itemDowngrades,
+        equipment,
+        damagedItems,
         dungeon: {
           ...state.dungeon,
           run: null,

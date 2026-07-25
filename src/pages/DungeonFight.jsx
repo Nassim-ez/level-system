@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../context/GameContext.jsx'
 import FightSprite from '../components/FightSprites.jsx'
 import { findDungeon, spriteFor } from '../data/dungeons.js'
+import { ITEMS, STUFEN_INFO, MATERIALIEN } from '../data/items.js'
+import { zieheDrops } from '../data/loot.js'
 import { auraDamageBonus, auraStage } from '../data/aura.js'
 import {
   ANGRIFFE,
@@ -232,7 +234,11 @@ function DungeonFight({ onExit }) {
           return neu
         }
         neu.beendet = 'sieg'
-        timers.current.push(setTimeout(() => setPopup({ art: 'sieg' }), 600))
+        // Beute erst beim Sieg ziehen – vorher bleibt sie verdeckt
+        const drops = zieheDrops(dungeon.id, state.rank, tuer.boss ? 2 : 1)
+        timers.current.push(
+          setTimeout(() => setPopup({ art: 'sieg', drops }), 600),
+        )
         return neu
       }
 
@@ -296,7 +302,7 @@ function DungeonFight({ onExit }) {
 
   // --- Abschluss ---------------------------------------------------------
   function siegBestaetigen() {
-    dispatch({ type: 'DUNGEON_CLEAR_DOOR' })
+    dispatch({ type: 'DUNGEON_CLEAR_DOOR', drops: popup.drops })
     setPopup(null)
     onExit()
   }
@@ -674,6 +680,35 @@ function DungeonFight({ onExit }) {
             <p className="mt-2" style={{ fontSize: '11px', color: 'var(--xp)' }}>
               Einschüchterung: +{auraBonus}% Schaden
             </p>
+            <div
+              className="mt-3 border px-2 py-2 text-center"
+              style={{ borderColor: 'var(--line)', borderRadius: '8px' }}
+            >
+              <p
+                style={{
+                  ...orbitron,
+                  fontSize: '9px',
+                  letterSpacing: '2px',
+                  color: 'var(--dim)',
+                }}
+              >
+                BEUTE
+              </p>
+              <p
+                style={{
+                  ...orbitron,
+                  fontSize: '18px',
+                  letterSpacing: '6px',
+                  color: 'var(--dim)',
+                }}
+              >
+                ? ? ?
+              </p>
+              <p style={{ fontSize: '10px', color: 'var(--dim)' }}>
+                {tuer.boss ? 'Zwei Funde' : 'Ein Fund'} · wird nach dem Sieg
+                aufgedeckt
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -710,6 +745,74 @@ function DungeonFight({ onExit }) {
                   : `${tuer.name} ist geräumt.`
                 : 'Du wirst aus dem Dungeon getragen. Deine XP behältst du, deine Aura nicht.'}
             </p>
+
+            {popup.art === 'sieg' && (
+              <div className="mt-3 flex flex-col gap-2">
+                <p
+                  style={{
+                    ...orbitron,
+                    fontSize: '9px',
+                    letterSpacing: '2px',
+                    color: 'var(--dim)',
+                  }}
+                >
+                  BEUTE
+                </p>
+                {popup.drops?.map((drop, i) => {
+                  if (drop.art === 'material') {
+                    const m = MATERIALIEN[drop.material]
+                    return (
+                      <div
+                        key={i}
+                        className="border px-2 py-1.5"
+                        style={{ borderColor: m.color, borderRadius: '8px' }}
+                      >
+                        <p style={{ fontSize: '13px', color: m.color }}>
+                          {m.name} ×{drop.menge}
+                        </p>
+                        <p style={{ fontSize: '10px', color: 'var(--dim)' }}>
+                          Materialien-Bündel
+                        </p>
+                      </div>
+                    )
+                  }
+                  const item = ITEMS[drop.itemId]
+                  const farbe = STUFEN_INFO[item.stufe].color
+                  return (
+                    <div
+                      key={i}
+                      className={drop.glueck ? 'aura-ring' : ''}
+                      style={{
+                        border: `1px solid ${farbe}`,
+                        borderRadius: '8px',
+                        padding: '6px 8px',
+                        boxShadow: drop.glueck ? `0 0 18px ${farbe}` : 'none',
+                      }}
+                    >
+                      <p style={{ fontSize: '13px', color: farbe }}>
+                        {item.name}{' '}
+                        <span style={{ fontSize: '10px' }}>
+                          {STUFEN_INFO[item.stufe].name}
+                        </span>
+                      </p>
+                      {drop.glueck && (
+                        <p
+                          style={{
+                            ...orbitron,
+                            fontSize: '9px',
+                            letterSpacing: '1px',
+                            color: farbe,
+                            textShadow: `0 0 8px ${farbe}`,
+                          }}
+                        >
+                          ✦ GLÜCKSFUND ✦
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             <button
               type="button"
               onClick={
