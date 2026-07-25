@@ -14,8 +14,6 @@ import {
   needsNegatives,
 } from '../data/quests.js'
 import { RANK_TESTS, buildRankTest, nextRank } from '../data/ranks.js'
-import { DUNGEONS, DUNGEON_XP, DUNGEON_EXERCISES } from '../data/dungeons.js'
-import { ITEMS } from '../data/items.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -192,109 +190,6 @@ function Quests() {
               )
             })}
           </div>
-        </Panel>
-      )}
-
-      {state.dungeonOpen && (
-        <Panel
-          title={`DUNGEON · RANG ${state.dungeonRank ?? state.rank}`}
-          accent="rgba(255,77,94,.5)"
-          glow="rgba(255,77,94,.15)"
-        >
-          {(() => {
-            const dungeon = DUNGEONS[state.dungeonRank ?? state.rank]
-            if (state.dungeonDone) {
-              return (
-                <div className="text-center">
-                  <p
-                    style={{
-                      ...orbitron,
-                      fontSize: '14px',
-                      letterSpacing: '2px',
-                      color: 'var(--ok)',
-                      textShadow: '0 0 10px rgba(77,255,166,.6)',
-                    }}
-                  >
-                    ABGESCHLOSSEN ✓
-                  </p>
-                  <p className="mt-1" style={{ fontSize: '13px', color: 'var(--dim)' }}>
-                    {dungeon.gegner} besiegt · +{DUNGEON_XP} XP · Drop:{' '}
-                    {ITEMS[dungeon.drop]?.name}
-                  </p>
-                </div>
-              )
-            }
-            return (
-              <>
-                <p className="text-[16px] font-semibold">{dungeon.name}</p>
-                <p
-                  style={{
-                    ...orbitron,
-                    fontSize: '12px',
-                    letterSpacing: '2px',
-                    color: 'var(--danger)',
-                  }}
-                >
-                  {dungeon.gegner}
-                </p>
-                <div
-                  className="mt-3 h-[10px] w-full overflow-hidden rounded-full border"
-                  style={{ background: '#1a0d12', borderColor: 'rgba(255,77,94,.4)' }}
-                >
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(state.dungeonHp / dungeon.hp) * 100}%`,
-                      background: 'linear-gradient(90deg, #7a1622, var(--danger))',
-                      boxShadow: '0 0 10px rgba(255,77,94,.7)',
-                      transition: 'width .4s',
-                    }}
-                  />
-                </div>
-                <p
-                  className="mt-1"
-                  style={{ ...orbitron, fontSize: '11px', color: 'var(--danger)' }}
-                >
-                  {state.dungeonHp} / {dungeon.hp} HP
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {DUNGEON_EXERCISES.map((ex) => (
-                    <button
-                      key={ex.quest}
-                      type="button"
-                      onClick={() =>
-                        dispatch({
-                          type: 'DUNGEON_DAMAGE',
-                          amount: ex.dmg,
-                          quest: ex.quest,
-                          reps: ex.reps,
-                        })
-                      }
-                      className="bg-transparent px-2 py-2"
-                      style={{
-                        ...orbitron,
-                        fontSize: '9px',
-                        letterSpacing: '1px',
-                        color: 'var(--text)',
-                        border: '1px solid rgba(255,77,94,.4)',
-                        borderRadius: '10px',
-                      }}
-                    >
-                      +{ex.reps} {QUESTS[ex.quest].name.toUpperCase()}{' '}
-                      <span style={{ color: 'var(--danger)' }}>−{ex.dmg}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2" style={{ fontSize: '11px', color: 'var(--dim)' }}>
-                  Je 100 Schritte = 1 Schaden (über EINTRAGEN unten). Dungeon-Reps
-                  zählen zusätzlich zu den Daily Quests.
-                </p>
-                <p className="mt-1" style={{ fontSize: '11px', color: 'var(--dim)' }}>
-                  Schließt Sonntag Mitternacht.
-                </p>
-              </>
-            )
-          })()}
         </Panel>
       )}
 

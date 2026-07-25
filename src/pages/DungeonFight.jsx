@@ -81,7 +81,6 @@ function DungeonFight({ onExit }) {
   const [eAnim, setEAnim] = useState('')
   const [shake, setShake] = useState(false)
   const [slam, setSlam] = useState(false)
-  const [roar, setRoar] = useState(null)
   const [flies, setFlies] = useState([])
   const [popup, setPopup] = useState(null)
   const [info, setInfo] = useState(false)
@@ -506,7 +505,6 @@ function DungeonFight({ onExit }) {
           </div>
         ))}
         {slam && <div className="slam" />}
-        {roar && <div className="roar">{roar}</div>}
 
         {/* Kampflog, zwei Zeilen */}
         <div className="pointer-events-none absolute bottom-[5px] left-[9px] right-[9px] z-[3]">

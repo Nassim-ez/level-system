@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from './context/GameContext.jsx'
-import { DUNGEONS, DUNGEON_XP } from './data/dungeons.js'
-import { ITEMS } from './data/items.js'
 import { CLASSES, CLASS_UNLOCK_LEVEL } from './data/classes.js'
 import { TITLES } from './data/titles.js'
 import Onboarding from './pages/Onboarding.jsx'
@@ -139,7 +137,6 @@ function snapshot(state) {
     onboarded: state.onboarded,
     level: state.level,
     rank: state.rank,
-    dungeonDone: state.dungeonDone,
     unlockedTitles: state.unlockedTitles,
   }
 }
@@ -160,14 +157,6 @@ function PopupManager() {
     }
     if (state.rank !== p.rank) {
       add.push({ type: 'rank', rank: state.rank })
-    }
-    if (state.dungeonDone && !p.dungeonDone) {
-      const dungeon = DUNGEONS[state.dungeonRank ?? state.rank]
-      add.push({
-        type: 'dungeon',
-        gegner: dungeon.gegner,
-        drop: ITEMS[dungeon.drop]?.name,
-      })
     }
     for (const id of state.unlockedTitles) {
       if (!p.unlockedTitles.includes(id)) {
@@ -224,21 +213,6 @@ function PopupManager() {
         </p>
         <p className="mt-1" style={{ fontSize: '12px', color: 'var(--dim)' }}>
           Eine Belohnung wurde deinem Inventar hinzugefügt.
-        </p>
-      </SystemPopup>
-    )
-  }
-  if (current.type === 'dungeon') {
-    return (
-      <SystemPopup title="DUNGEON ABGESCHLOSSEN" onClose={close}>
-        <p className="mt-2 text-[15px]">
-          <span className="font-bold">{current.gegner}</span> besiegt!
-        </p>
-        <p className="mt-1" style={{ fontSize: '13px', color: 'var(--xp)' }}>
-          +{DUNGEON_XP} XP
-        </p>
-        <p style={{ fontSize: '12px', color: 'var(--ok)' }}>
-          Drop erhalten: {current.drop}
         </p>
       </SystemPopup>
     )

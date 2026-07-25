@@ -11,12 +11,11 @@ import { CLASSES } from '../data/classes.js'
 import { TITLES } from '../data/titles.js'
 import { normalizeGender } from '../data/gender.js'
 import { auraGain } from '../data/aura.js'
-import { TUER_XP, RAST_GEGNER_HEILUNG } from '../data/combat.js'
+import { TUER_XP, BOSS_XP, RAST_GEGNER_HEILUNG } from '../data/combat.js'
 import {
   ITEMS,
   herabgestuft,
   hochgestuft,
-  naechsteStufe,
   aufwertungKosten,
   reparaturKosten,
   kostenErfuellt,
@@ -28,7 +27,7 @@ import {
   buildRankTest,
   nextRank,
 } from '../data/ranks.js'
-import { DUNGEONS, DUNGEON_XP, findDungeon, doorHp } from '../data/dungeons.js'
+import { findDungeon, doorHp } from '../data/dungeons.js'
 
 const STORAGE_KEY = 'system_save'
 
@@ -86,10 +85,6 @@ const initialState = {
     klimmzuege: 3,
     dehnen: 10,
   },
-  dungeonOpen: false,
-  dungeonRank: null,
-  dungeonHp: null,
-  dungeonDone: false,
   log: [],
 }
 
@@ -276,20 +271,6 @@ function reducer(state, action) {
           log = withLog(log, 'Serie verloren', { detail: '−50 XP' })
         }
       }
-      let { dungeonOpen, dungeonRank, dungeonHp, dungeonDone } = state
-      if (action.weekend) {
-        if (!dungeonOpen) {
-          dungeonOpen = true
-          dungeonRank = state.rank
-          dungeonHp = DUNGEONS[state.rank].hp
-          dungeonDone = false
-        }
-      } else {
-        dungeonOpen = false
-        dungeonRank = null
-        dungeonHp = null
-        dungeonDone = false
-      }
       // Erledigte Wochen-Aufgaben aus dem Pool entfernen, dann neu ziehen
       const poolTasks = state.poolTasks.filter((t) => !t.done)
       const drawnTask =
@@ -309,10 +290,6 @@ function reducer(state, action) {
         log,
         poolTasks,
         drawnTask,
-        dungeonOpen,
-        dungeonRank,
-        dungeonHp,
-        dungeonDone,
       }
     }
     case 'COMPLETE_QUEST': {
@@ -489,7 +466,7 @@ function reducer(state, action) {
       // Bosssieg: Tor öffnet sich, doppelte Beute und XP
       const log = withLog(beute.log, `${dungeon.boss} besiegt`, {
         detail: `${dungeon.name} abgeschlossen`,
-        xp: DUNGEON_XP,
+        xp: BOSS_XP,
       })
       let next = {
         ...state,
@@ -511,7 +488,7 @@ function reducer(state, action) {
         },
         log,
       }
-      next = reducer(next, { type: 'ADD_XP', amount: DUNGEON_XP })
+      next = reducer(next, { type: 'ADD_XP', amount: BOSS_XP })
       return next
     }
     case 'UPGRADE_ITEM': {
@@ -719,7 +696,6 @@ function reducer(state, action) {
     }
     case 'LOG_STEPS': {
       const steps = Math.max(0, Math.floor(action.steps) || 0)
-      const prevSteps = state.questProgress.steps ?? 0
       const earned = Math.min(Math.floor(steps / 1000) * 10, action.cap)
       const already = state.questProgress.stepsXp ?? 0
       const delta = earned - already
@@ -733,44 +709,6 @@ function reducer(state, action) {
           stepsXp: Math.max(earned, already),
         },
       }
-      // Je 100 neue Schritte = 1 Dungeon-Schaden
-      const dmg = Math.floor(steps / 100) - Math.floor(prevSteps / 100)
-      if (dmg > 0) next = reducer(next, { type: 'DUNGEON_DAMAGE', amount: dmg })
-      return next
-    }
-    case 'DUNGEON_DAMAGE': {
-      if (!state.dungeonOpen || state.dungeonDone || state.dungeonHp == null) {
-        return state
-      }
-      let lifetime = state.lifetime
-      if (
-        (action.quest === 'liegestuetze' || action.quest === 'klimmzuege') &&
-        action.reps > 0
-      ) {
-        lifetime = {
-          ...lifetime,
-          [action.quest]: (lifetime[action.quest] ?? 0) + action.reps,
-        }
-      }
-      const hp = Math.max(0, state.dungeonHp - action.amount)
-      if (hp > 0) return { ...state, lifetime, dungeonHp: hp }
-      // Sieg!
-      const dungeon = DUNGEONS[state.dungeonRank ?? state.rank]
-      const drop = ITEMS[dungeon.drop]
-      let log = withLog(state.log, 'Dungeon abgeschlossen', {
-        detail: `${dungeon.gegner} besiegt`,
-        xp: DUNGEON_XP,
-      })
-      log = withLog(log, `${drop.name} erhalten`, { detail: 'Dungeon-Drop' })
-      let next = {
-        ...state,
-        dungeonHp: 0,
-        dungeonDone: true,
-        lifetime: { ...lifetime, dungeons: lifetime.dungeons + 1 },
-        inventory: [...state.inventory, dungeon.drop],
-        log,
-      }
-      next = reducer(next, { type: 'ADD_XP', amount: DUNGEON_XP })
       return next
     }
     case 'RANK_TASK_PROGRESS': {
@@ -888,13 +826,7 @@ export function GameProvider({ children }) {
     if (!state.onboarded) return
     const today = todayKey()
     if (state.lastDay !== today) {
-      const dow = new Date().getDay()
-      dispatch({
-        type: 'NEW_DAY',
-        today,
-        dayType: getDayType(),
-        weekend: dow === 0 || dow === 6,
-      })
+      dispatch({ type: 'NEW_DAY', today, dayType: getDayType() })
     }
   }, [state.lastDay, state.onboarded])
 
