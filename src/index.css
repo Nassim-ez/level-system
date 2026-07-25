@@ -39,6 +39,137 @@ h4 {
   font-family: 'Orbitron', sans-serif;
 }
 
+/* --- Dungeon-Kampf --- */
+@keyframes fight-idle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes fight-attack-right {
+  0% {
+    transform: translateX(0);
+  }
+  35% {
+    transform: translateX(18px) scale(1.05);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fight-attack-left {
+  0% {
+    transform: translateX(0);
+  }
+  35% {
+    transform: translateX(-18px) scale(1.05);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fight-hit {
+  0%,
+  100% {
+    transform: translateX(0);
+    filter: none;
+  }
+  20% {
+    transform: translateX(-6px);
+    filter: brightness(2.2) saturate(0.4);
+  }
+  40% {
+    transform: translateX(5px);
+    filter: brightness(1.6);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+}
+
+@keyframes fight-die {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.85);
+  }
+}
+
+@keyframes fight-flash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes aura-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(143, 224, 255, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(143, 224, 255, 0.8);
+  }
+}
+
+@keyframes warn-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -38px);
+  }
+}
+
+.fight-idle {
+  animation: fight-idle 2.6s ease-in-out infinite;
+}
+.fight-attack-right {
+  animation: fight-attack-right 0.45s ease-out;
+}
+.fight-attack-left {
+  animation: fight-attack-left 0.45s ease-out;
+}
+.fight-hit {
+  animation: fight-hit 0.4s ease-out;
+}
+.fight-die {
+  animation: fight-die 0.6s ease-in forwards;
+}
+.aura-ring {
+  animation: aura-ring 2.4s ease-in-out infinite;
+}
+.warn-blink {
+  animation: warn-blink 0.9s ease-in-out infinite;
+}
+.float-up {
+  animation: float-up 1s ease-out forwards;
+}
+
 @keyframes rank-pulse {
   0%,
   100% {

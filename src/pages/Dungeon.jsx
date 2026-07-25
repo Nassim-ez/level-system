@@ -9,6 +9,7 @@ import {
   doorHp,
 } from '../data/dungeons.js'
 import { RANKS } from '../data/ranks.js'
+import DungeonFight from './DungeonFight.jsx'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -195,7 +196,7 @@ function Auswahl({ state, dispatch }) {
   )
 }
 
-function Tuerkarte({ state, dispatch, dungeon }) {
+function Tuerkarte({ state, dispatch, dungeon, onFight }) {
   const { progress, inside, door } = state.dungeon
   const geschafft = dungeon.tueren.filter((t) => progress[t.nr]).length
   const naechste = dungeon.tueren.find((t) => !progress[t.nr])
@@ -313,9 +314,10 @@ function Tuerkarte({ state, dispatch, dungeon }) {
                     {offen && !aktiv && (
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
                           dispatch({ type: 'DUNGEON_OPEN_DOOR', nr: tuer.nr })
-                        }
+                          onFight()
+                        }}
                         className="mt-1 bg-transparent px-3 py-1"
                         style={{
                           ...orbitron,
@@ -332,18 +334,18 @@ function Tuerkarte({ state, dispatch, dungeon }) {
                     {aktiv && (
                       <button
                         type="button"
-                        onClick={() => dispatch({ type: 'DUNGEON_CLEAR_DOOR' })}
+                        onClick={() => onFight()}
                         className="mt-1 bg-transparent px-3 py-1"
                         style={{
                           ...orbitron,
                           fontSize: '9px',
                           letterSpacing: '2px',
-                          color: 'var(--ok)',
-                          border: '1px solid var(--ok)',
+                          color: 'var(--glow)',
+                          border: '1px solid var(--glow)',
                           borderRadius: '8px',
                         }}
                       >
-                        BESIEGT
+                        KAMPF
                       </button>
                     )}
                   </div>
@@ -407,6 +409,10 @@ function Tuerkarte({ state, dispatch, dungeon }) {
 function Dungeon() {
   const { state, dispatch } = useGame()
   const [gate, setGate] = useState(false)
+  // Ein laufender Kampf wird nach App-Neustart direkt fortgesetzt
+  const [imKampf, setImKampf] = useState(
+    () => !!state.dungeon.fight && state.dungeon.door > 0,
+  )
   const dungeon = findDungeon(state.dungeon.run)
 
   // Einmalige Einblendung, sobald sich das Tor schließt
@@ -416,11 +422,23 @@ function Dungeon() {
     setWarInside(state.dungeon.inside)
   }, [state.dungeon.inside, warInside])
 
+  // Kampf nur mit betretener Tür; nach Sieg/Rückzug zurück zur Karte
+  const kampfAktiv = imKampf && !gate && state.dungeon.door > 0
+  useEffect(() => {
+    if (state.dungeon.door === 0) setImKampf(false)
+  }, [state.dungeon.door])
+
   return (
     <>
       {gate && <GateOverlay onDone={() => setGate(false)} />}
+      {kampfAktiv && <DungeonFight onExit={() => setImKampf(false)} />}
       {dungeon ? (
-        <Tuerkarte state={state} dispatch={dispatch} dungeon={dungeon} />
+        <Tuerkarte
+          state={state}
+          dispatch={dispatch}
+          dungeon={dungeon}
+          onFight={() => setImKampf(true)}
+        />
       ) : (
         <Auswahl state={state} dispatch={dispatch} />
       )}

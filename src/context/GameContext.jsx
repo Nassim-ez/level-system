@@ -11,6 +11,7 @@ import { CLASSES } from '../data/classes.js'
 import { TITLES } from '../data/titles.js'
 import { normalizeGender } from '../data/gender.js'
 import { auraGain } from '../data/aura.js'
+import { TUER_XP, RAST_GEGNER_HEILUNG } from '../data/combat.js'
 import { ITEMS } from '../data/items.js'
 import {
   RANK_THRESHOLDS,
@@ -60,7 +61,9 @@ const initialState = {
     enemyHp: null,
     killed: 0,
     stones: 1,
+    fight: null, // laufender Kampf, wird nach jedem Zug gespeichert
   },
+  itemDowngrades: {}, // durch Niederlagen herabgestufte Items
   klasse: null,
   gender: null,
   onboarded: false,
@@ -84,13 +87,22 @@ function withLog(log, text, extra = {}) {
   return [{ datum: todayKey(), text, ...extra }, ...log].slice(0, 50)
 }
 
+// Herabgestufte Items verlieren pro Stufe ein Drittel ihres Bonus
+export function itemBonusWert(itemId, state) {
+  const bonus = ITEMS[itemId]?.bonus
+  if (!bonus) return 0
+  const stufen = state.itemDowngrades?.[itemId] ?? 0
+  if (!stufen) return bonus.wert
+  return Math.max(1, Math.round(bonus.wert * Math.pow(2 / 3, stufen)))
+}
+
 function xpMultiplier(state, stat) {
   let pct = 0
   for (const itemId of Object.values(state.equipment)) {
     if (!itemId) continue
     const bonus = ITEMS[itemId]?.bonus
     if (bonus?.typ === 'xp' && (!bonus.stat || bonus.stat === stat)) {
-      pct += bonus.wert
+      pct += itemBonusWert(itemId, state)
     }
   }
   const klasse = state.klasse ? CLASSES[state.klasse] : null
@@ -405,6 +417,9 @@ function reducer(state, action) {
           detail: 'Das Tor hat sich geschlossen',
         })
       }
+      // Ein gespeicherter Kampf gilt nur für seine eigene Tür
+      const fight =
+        state.dungeon.fight?.nr === action.nr ? state.dungeon.fight : null
       return {
         ...state,
         dungeon: {
@@ -412,6 +427,7 @@ function reducer(state, action) {
           inside: true,
           door: action.nr,
           enemyHp: doorHp(tuer),
+          fight,
         },
         log,
       }
@@ -423,7 +439,7 @@ function reducer(state, action) {
       const progress = { ...state.dungeon.progress, [tuer.nr]: true }
       const killed = state.dungeon.killed + tuer.anzahl
       if (!tuer.boss) {
-        return {
+        let next = {
           ...state,
           dungeon: {
             ...state.dungeon,
@@ -431,11 +447,15 @@ function reducer(state, action) {
             killed,
             door: 0,
             enemyHp: null,
+            fight: null,
           },
           log: withLog(state.log, `Tür ${tuer.nr} geschafft`, {
             detail: `${tuer.name} · ${tuer.anzahl}× ${tuer.gegnerart}`,
+            xp: TUER_XP,
           }),
         }
+        next = reducer(next, { type: 'ADD_XP', amount: TUER_XP })
+        return next
       }
       // Bosssieg: Tor öffnet sich, Beute und XP
       let log = withLog(state.log, `${dungeon.boss} besiegt`, {
@@ -455,6 +475,7 @@ function reducer(state, action) {
           inside: false,
           enemyHp: null,
           killed: 0,
+          fight: null,
         },
         inventory: [...state.inventory, dungeon.drop],
         lifetime: {
@@ -465,6 +486,76 @@ function reducer(state, action) {
       }
       next = reducer(next, { type: 'ADD_XP', amount: DUNGEON_XP })
       return next
+    }
+    case 'DUNGEON_FIGHT_SYNC': {
+      // Kampfzustand nach jedem Zug sichern
+      return { ...state, dungeon: { ...state.dungeon, fight: action.fight } }
+    }
+    case 'DUNGEON_REST': {
+      // Rasten: erholt, zurück zur Türkarte – das Tor bleibt zu
+      const fight = state.dungeon.fight
+      return {
+        ...state,
+        dungeon: {
+          ...state.dungeon,
+          door: 0,
+          fight: fight
+            ? {
+                ...fight,
+                gerastet: true,
+                // Der aktuelle Gegner erholt sich um 25 %
+                enemyHp: Math.min(
+                  fight.enemyMaxHp,
+                  Math.round(fight.enemyHp + fight.enemyMaxHp * RAST_GEGNER_HEILUNG),
+                ),
+              }
+            : null,
+        },
+        log: withLog(state.log, 'Gerastet', {
+          detail: 'Vitalität aufgefüllt · Gegner erholt sich',
+        }),
+      }
+    }
+    case 'DUNGEON_DEFEAT': {
+      // Niederlage: Aura erlischt, Fortschritt weg, ein getragenes Item leidet
+      const getragene = Object.values(state.equipment).filter(Boolean)
+      let itemDowngrades = state.itemDowngrades
+      let downgraded = null
+      if (getragene.length > 0) {
+        downgraded = getragene[Math.floor(Math.random() * getragene.length)]
+        itemDowngrades = {
+          ...itemDowngrades,
+          [downgraded]: (itemDowngrades[downgraded] ?? 0) + 1,
+        }
+      }
+      const dungeon = findDungeon(state.dungeon.run)
+      let log = withLog(state.log, 'Rückzug aus dem Dungeon', {
+        detail: `${dungeon?.name ?? 'Dungeon'} · Fortschritt verloren`,
+      })
+      if (downgraded) {
+        log = withLog(log, `${ITEMS[downgraded].name} herabgestuft`, {
+          detail: 'Im Kampf beschädigt',
+        })
+      }
+      log = withLog(log, 'Deine Aura ist erloschen', {
+        detail: 'Im Dungeon gefallen',
+      })
+      return {
+        ...state,
+        aura: 0,
+        itemDowngrades,
+        dungeon: {
+          ...state.dungeon,
+          run: null,
+          door: 0,
+          progress: {},
+          inside: false,
+          enemyHp: null,
+          killed: 0,
+          fight: null,
+        },
+        log,
+      }
     }
     case 'DUNGEON_RETURN_STONE': {
       // Rückkehrstein: raus ohne Beute, Fortschritt verfällt, XP bleiben
@@ -481,6 +572,7 @@ function reducer(state, action) {
           inside: false,
           enemyHp: null,
           killed: 0,
+          fight: null,
         },
         log: withLog(state.log, 'Rückkehrstein benutzt', {
           detail: `${dungeon?.name ?? 'Dungeon'} verlassen · kein Drop`,
