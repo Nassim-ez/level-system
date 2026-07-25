@@ -141,20 +141,20 @@ function GenderPopup({ current, onSelect, onClose }) {
         <p className="mt-2 text-[13px]" style={{ color: 'var(--dim)' }}>
           Wähle deine Erscheinung
         </p>
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-4 grid grid-cols-2 gap-3">
           {GENDERS.map(({ id, label }) => (
             <button
               key={id}
               type="button"
               onClick={() => onSelect(id)}
-              className="w-full bg-transparent px-4 py-3"
+              className="w-full bg-transparent px-3 py-4"
               style={{
                 ...orbitron,
-                fontSize: '12px',
+                fontSize: '11px',
                 letterSpacing: '2px',
                 color: id === current ? 'var(--xp)' : 'var(--text)',
                 border: `1px solid ${id === current ? 'var(--xp)' : 'var(--line)'}`,
-                borderRadius: '10px',
+                borderRadius: '12px',
               }}
             >
               {label}

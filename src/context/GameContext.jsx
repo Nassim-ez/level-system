@@ -9,6 +9,7 @@ import {
 } from '../data/quests.js'
 import { CLASSES } from '../data/classes.js'
 import { TITLES } from '../data/titles.js'
+import { normalizeGender } from '../data/gender.js'
 import { ITEMS } from '../data/items.js'
 import {
   RANK_THRESHOLDS,
@@ -310,7 +311,7 @@ function reducer(state, action) {
         ...state,
         onboarded: true,
         name: action.name?.trim() || state.name,
-        gender: action.gender ?? state.gender,
+        gender: normalizeGender(action.gender ?? state.gender),
         rank: action.rank,
         baseTargets: action.baseTargets ?? state.baseTargets,
         level,
@@ -331,7 +332,7 @@ function reducer(state, action) {
       return { ...state, title: TITLES[action.id].name }
     }
     case 'SET_GENDER': {
-      if (!['m', 'w', 'd'].includes(action.gender)) return state
+      if (!['m', 'w'].includes(action.gender)) return state
       return { ...state, gender: action.gender }
     }
     case 'CHOOSE_CLASS': {
@@ -492,7 +493,10 @@ function reducer(state, action) {
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? { ...initialState, ...JSON.parse(raw) } : initialState
+    if (!raw) return initialState
+    const gespeichert = { ...initialState, ...JSON.parse(raw) }
+    // Altstände mit dem entfernten "d" auf "m" migrieren
+    return { ...gespeichert, gender: normalizeGender(gespeichert.gender) }
   } catch {
     return initialState
   }

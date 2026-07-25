@@ -135,7 +135,7 @@ function Onboarding() {
             IDENTIFIKATION
           </p>
           <p className="mt-3 text-[15px]">Wähle deine Erscheinung</p>
-          <div className="mt-4 flex flex-col gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-3">
             {GENDERS.map(({ id, label }) => (
               <button
                 key={id}
@@ -144,15 +144,15 @@ function Onboarding() {
                   setGender(id)
                   setStep(firstQuestion)
                 }}
-                className="w-full bg-transparent px-4 py-3"
+                className="w-full bg-transparent px-3 py-6"
                 style={{
                   ...orbitron,
-                  fontSize: '13px',
+                  fontSize: '12px',
                   letterSpacing: '2px',
                   color: 'var(--text)',
                   background: 'var(--panel)',
                   border: '1px solid var(--line)',
-                  borderRadius: '12px',
+                  borderRadius: '14px',
                   boxShadow: '0 0 12px rgba(63,182,255,.08)',
                 }}
               >

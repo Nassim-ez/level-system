@@ -156,7 +156,6 @@ const ANATOMY_W = [
 
 const FIGURES = {
   m: { path: BODY_PATH_M, anatomy: ANATOMY_M, anchors: ANCHORS.m },
-  d: { path: BODY_PATH_M, anatomy: ANATOMY_M, anchors: ANCHORS.m },
   w: { path: BODY_PATH_W, anatomy: ANATOMY_W, anchors: ANCHORS.w },
 }
 
@@ -241,7 +240,7 @@ function CharakterFigur({ state, selected, onSelect }) {
     state.inventory.filter((id) => ITEMS[id]?.slot === slot).length
 
   const allSlots = [...LEFT_SLOTS, ...RIGHT_SLOTS]
-  const fig = FIGURES[state.gender] ?? FIGURES.d
+  const fig = FIGURES[state.gender] ?? FIGURES.m
 
   return (
     <svg viewBox="0 0 400 370" className="w-full">
