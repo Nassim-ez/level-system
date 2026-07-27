@@ -1,3 +1,5 @@
+import { auraBlockBonus } from './aura.js'
+
 // ---------------------------------------------------------------------------
 // Kampfsystem der Tür-Dungeons. Mechanik und Werte 1:1 aus dungeon-mockup.html,
 // ergänzt um die beiden eigenen Regeln dieses Projekts:
@@ -57,9 +59,39 @@ export const BELASTUNG_HEILEN = 6
 export const BLOCK_ERFOLG_SCHADEN = 0.3
 export const BLOCK_BRUCH_SCHADEN = 0.85
 
-// Erfolgschance des eigenen Blocks steht an der Tür
-export function blockChance(tuer) {
-  return tuer?.blockchance ?? 0.75
+// Blockchance: Basiswert des Gegners plus Aura und Level-Vorsprung
+export const LEVEL_PRO_STUFE = 1.5
+export const LEVEL_GRENZE = 15
+export const BLOCK_MIN = 0.15
+export const BLOCK_MAX = 0.9
+
+/**
+ * Aufschlüsselung der Blockchance.
+ * gegner: Tür-Objekt (blockchance, stufe/hp als Gegnerstärke)
+ * spieler: { level, aura }
+ */
+export function blockChanceDetail(gegner, spieler) {
+  const basis = (gegner?.blockchance ?? 0.75) * 100
+  const aura = auraBlockBonus(spieler?.aura ?? 0, spieler?.level ?? 1)
+  const roh = ((spieler?.level ?? 1) - (gegner?.stufe ?? 1)) * LEVEL_PRO_STUFE
+  // Erst runden, dann summieren – so ergibt die angezeigte Aufschlüsselung
+  // exakt den Gesamtwert
+  const level = Math.round(
+    Math.max(-LEVEL_GRENZE, Math.min(LEVEL_GRENZE, roh)),
+  )
+  const summe = basis + aura + level
+  const gesamt = Math.max(BLOCK_MIN * 100, Math.min(BLOCK_MAX * 100, summe))
+  return {
+    basis: Math.round(basis),
+    aura,
+    level: Math.round(level),
+    gesamt: Math.round(gesamt),
+    chance: gesamt / 100,
+  }
+}
+
+export function blockChance(gegner, spieler) {
+  return blockChanceDetail(gegner, spieler).chance
 }
 
 // Gruppen: jeder weitere lebende Gegner erhöht den Schaden um 30 %

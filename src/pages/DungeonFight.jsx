@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../context/GameContext.jsx'
 import FightSprite from '../components/FightSprites.jsx'
 import { findDungeon } from '../data/dungeons.js'
-import { ITEMS, STUFEN_INFO, MATERIALIEN } from '../data/items.js'
+import { ITEMS, MATERIALIEN, raritaet } from '../data/items.js'
 import { zieheDrops } from '../data/loot.js'
 import { auraDamageBonus, auraStage } from '../data/aura.js'
 import {
@@ -15,7 +15,7 @@ import {
   BELASTUNG_BLOCK,
   BELASTUNG_HEILEN,
   belastungsStufe,
-  blockChance,
+  blockChanceDetail,
   berechneSchaden,
   gegnerSchaden,
   moodIndex,
@@ -146,6 +146,10 @@ function DungeonFight({ onExit }) {
     dungeon.rank,
   )
   const stufe = belastungsStufe(k.belastung)
+  const blockDetail = blockChanceDetail(tuer, {
+    level: state.level,
+    aura: state.aura,
+  })
   const kampfVorbei = !!popup || !!k.beendet
   const auraStufe = auraStage(state.aura, state.level)
   const mi = moodIndex(k.enemyHp, k.enemyMaxHp)
@@ -287,7 +291,7 @@ function DungeonFight({ onExit }) {
     setK((kk) => {
       // Der Wurf entscheidet jetzt, ob der Block hält oder bricht – das Ergebnis
       // gilt auch, wenn der Angriff erst in einem späteren Zug kommt.
-      const haelt = Math.random() < blockChance(tuer)
+      const haelt = Math.random() < blockDetail.chance
       let neu = {
         ...kk,
         belastung: kk.belastung + BELASTUNG_BLOCK,
@@ -675,7 +679,7 @@ function DungeonFight({ onExit }) {
         >
           Plank
           <small style={{ ...orbitron, display: 'block', fontSize: '6.5px', letterSpacing: '1px', color: 'var(--dim)', marginTop: 1 }}>
-            BLOCKEN {Math.round(blockChance(tuer) * 100)}%
+            BLOCKEN {blockDetail.gesamt}%
           </small>
         </button>
         <button
@@ -750,9 +754,19 @@ function DungeonFight({ onExit }) {
               GEGEN IHN
             </b>
             <p style={{ fontSize: '12px', color: 'var(--dim)', marginTop: 4 }}>
-              Blockchance <span style={{ color: 'var(--glow)' }}>{Math.round(blockChance(tuer) * 100)}%</span> ·
+              Blockchance <span style={{ color: 'var(--glow)' }}>{blockDetail.gesamt}%</span> ·
               Heilungen: <span style={{ color: 'var(--xp)' }}>{k.heilungen}</span> ·
               Einschüchterung: <span style={{ color: 'var(--xp)' }}>+{auraBonus}%</span>
+            </p>
+            <p style={{ ...orbitron, fontSize: '10px', color: 'var(--dim)', marginTop: 3 }}>
+              Basis {blockDetail.basis}% · Aura{' '}
+              {blockDetail.aura >= 0 ? '+' : ''}
+              {blockDetail.aura} · Level{' '}
+              {blockDetail.level >= 0 ? '+' : ''}
+              {blockDetail.level} ={' '}
+              <span style={{ color: 'var(--glow)' }}>{blockDetail.gesamt}%</span>
+              {blockDetail.basis + blockDetail.aura + blockDetail.level !==
+                blockDetail.gesamt && ' (Grenze)'}
             </p>
             <b style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px', color: 'var(--dim)', display: 'block', marginTop: 12 }}>
               BEUTE
@@ -837,7 +851,7 @@ function DungeonFight({ onExit }) {
                     )
                   }
                   const item = ITEMS[drop.itemId]
-                  const farbe = STUFEN_INFO[item.stufe].color
+                  const farbe = raritaet(item)?.color ?? 'var(--glow)'
                   return (
                     <div
                       key={i}
@@ -849,7 +863,7 @@ function DungeonFight({ onExit }) {
                       }}
                     >
                       <p style={{ fontSize: '13px', color: farbe }}>
-                        {item.name} <span style={{ fontSize: '10px' }}>{STUFEN_INFO[item.stufe].name}</span>
+                        {item.name} <span style={{ fontSize: '10px' }}>{raritaet(item)?.name}</span>
                       </p>
                       {drop.glueck && (
                         <p style={{ ...orbitron, fontSize: '9px', color: farbe, textShadow: `0 0 8px ${farbe}` }}>

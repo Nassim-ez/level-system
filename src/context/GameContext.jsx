@@ -16,9 +16,11 @@ import {
   ITEMS,
   herabgestuft,
   hochgestuft,
-  aufwertungKosten,
-  reparaturKosten,
-  kostenErfuellt,
+  aufwertKosten,
+  schmelzErtrag,
+  rangObergrenze,
+  migriereItemId,
+  raritaet,
 } from '../data/items.js'
 import { zieheDrops, materialName } from '../data/loot.js'
 import {
@@ -57,7 +59,7 @@ const initialState = {
     hose: null,
     schuhe: null,
   },
-  inventory: ['holzschwert__grau', 'serienschutz'],
+  inventory: ['holzschwert__r0', 'serienschutz'],
   rankTestActive: false,
   rankTestTasks: null, // beim Freischalten eingefrorene Prüfungsziele
   aura: 0,
@@ -71,7 +73,7 @@ const initialState = {
     stones: 1,
     fight: null, // laufender Kampf, wird nach jedem Zug gespeichert
   },
-  materials: { eisenstaub: 0, knochenmehl: 0, nebelessenz: 0 },
+  materials: { basalt: 0, knochen: 0, schatten: 0, wolf: 0 },
   damagedItems: {}, // im Dungeon beschädigte Items (itemId → true)
   klasse: null,
   gender: null,
@@ -104,8 +106,8 @@ function verteileBeute(state, drops) {
       const item = ITEMS[drop.itemId]
       log = withLog(log, `${item?.name ?? drop.itemId} erhalten`, {
         detail: drop.glueck
-          ? `Glücksfund · ${item?.stufe}`
-          : `Beute · ${item?.stufe}`,
+          ? `Glücksfund · ${raritaet(item)?.name ?? ''}`
+          : `Beute · ${raritaet(item)?.name ?? ''}`,
       })
     }
   }
@@ -492,14 +494,19 @@ function reducer(state, action) {
       return next
     }
     case 'UPGRADE_ITEM': {
-      // Genau eine Stufe hoch, kein Überspringen
+      // Genau eine Rarität hoch, nie über die Obergrenze des eigenen Rangs
       const item = ITEMS[action.itemId]
       const ziel = hochgestuft(action.itemId)
       if (!item || !ziel) return state
-      const kosten = aufwertungKosten(ITEMS[ziel].stufe)
-      if (!kostenErfuellt(kosten, state.materials)) return state
-      const materials = { ...state.materials }
-      for (const [mat, menge] of Object.entries(kosten)) materials[mat] -= menge
+      const beschaedigt = !!state.damagedItems?.[action.itemId]
+      // Nur die Wiederherstellung darf die Rang-Grenze berühren
+      if (!beschaedigt && item.rar >= rangObergrenze(state.rank)) return state
+
+      const kosten = aufwertKosten(item.rar, beschaedigt)
+      const vorrat = state.materials?.[item.material] ?? 0
+      if (kosten == null || vorrat < kosten) return state
+
+      const materials = { ...state.materials, [item.material]: vorrat - kosten }
 
       // Item entweder im Inventar oder am Körper ersetzen
       let inventory = [...state.inventory]
@@ -516,61 +523,46 @@ function reducer(state, action) {
       }
       const damagedItems = { ...state.damagedItems }
       delete damagedItems[action.itemId]
+
       return {
         ...state,
         materials,
         inventory,
         equipment,
         damagedItems,
-        log: withLog(state.log, `${item.name} aufgewertet`, {
-          detail: `${item.stufe} → ${ITEMS[ziel].stufe}`,
-        }),
+        log: withLog(
+          state.log,
+          `${item.name} ${beschaedigt ? 'wiederhergestellt' : 'aufgewertet'}`,
+          {
+            detail: `${raritaet(item)?.name} → ${raritaet(ITEMS[ziel])?.name} · ${kosten} ${materialName(item.material)}`,
+          },
+        ),
       }
     }
-    case 'REPAIR_ITEM': {
-      // Beschädigtes Item wiederherstellen – günstiger als Aufwerten
+    case 'MELT_ITEM': {
+      // Einschmelzen gibt Material der Item-Sorte; Getragenes bleibt tabu
       const item = ITEMS[action.itemId]
-      if (!item || !state.damagedItems?.[action.itemId]) return state
-      const ziel = hochgestuft(action.itemId)
-      const zielStufe = ziel ? ITEMS[ziel].stufe : null
-      const kosten = zielStufe ? reparaturKosten(zielStufe) : null
-      // Grau beschädigt: nur Markierung entfernen, keine Kosten
-      if (!ziel) {
-        const damagedItems = { ...state.damagedItems }
-        delete damagedItems[action.itemId]
-        return {
-          ...state,
-          damagedItems,
-          log: withLog(state.log, `${item.name} instand gesetzt`, {
-            detail: 'Schaden behoben',
-          }),
-        }
-      }
-      if (!kostenErfuellt(kosten, state.materials)) return state
-      const materials = { ...state.materials }
-      for (const [mat, menge] of Object.entries(kosten)) materials[mat] -= menge
-      let inventory = [...state.inventory]
-      let equipment = { ...state.equipment }
-      const idx = inventory.indexOf(action.itemId)
-      if (idx >= 0) {
-        inventory[idx] = ziel
-      } else {
-        const slot = Object.keys(equipment).find(
-          (s) => equipment[s] === action.itemId,
-        )
-        if (!slot) return state
-        equipment[slot] = ziel
+      if (!item || item.rar == null) return state
+      const idx = state.inventory.indexOf(action.itemId)
+      if (idx < 0) return state
+
+      const ertrag = schmelzErtrag(item.rar)
+      const inventory = [...state.inventory]
+      inventory.splice(idx, 1)
+      const materials = {
+        ...state.materials,
+        [item.material]: (state.materials?.[item.material] ?? 0) + ertrag,
       }
       const damagedItems = { ...state.damagedItems }
       delete damagedItems[action.itemId]
+
       return {
         ...state,
-        materials,
         inventory,
-        equipment,
+        materials,
         damagedItems,
-        log: withLog(state.log, `${item.name} wiederhergestellt`, {
-          detail: `${item.stufe} → ${zielStufe}`,
+        log: withLog(state.log, `${item.name} eingeschmolzen`, {
+          detail: `+${ertrag} ${materialName(item.material)}`,
         }),
       }
     }
@@ -614,7 +606,7 @@ function reducer(state, action) {
           getragene[Math.floor(Math.random() * getragene.length)]
         const schlechter = herabgestuft(itemId)
         if (schlechter) {
-          // Eine Qualitätsstufe herunter, grau bleibt grau
+          // Eine Rarität herunter, Gewöhnlich bleibt Gewöhnlich
           equipment = { ...equipment, [slot]: schlechter }
           damagedItems = { ...damagedItems, [schlechter]: true }
           beschaedigt = { alt: itemId, neu: schlechter }
@@ -634,7 +626,7 @@ function reducer(state, action) {
           detail:
             beschaedigt.alt === beschaedigt.neu
               ? 'Bereits gewöhnlich – keine weitere Stufe'
-              : `${alt.stufe} → ${neu.stufe}`,
+              : `${raritaet(alt)?.name} → ${raritaet(neu)?.name}`,
         })
       }
       log = withLog(log, 'Deine Aura ist erloschen', {
@@ -800,13 +792,43 @@ function reducer(state, action) {
   }
 }
 
+// Alte Materialnamen auf die vier Sorten des Händlers abbilden
+const ALTE_MATERIALIEN = {
+  eisenstaub: 'basalt',
+  knochenmehl: 'knochen',
+  nebelessenz: 'schatten',
+}
+
+function migriereSpielstand(gespeichert) {
+  const inventory = (gespeichert.inventory ?? []).map(migriereItemId)
+  const equipment = { ...gespeichert.equipment }
+  for (const slot of Object.keys(equipment)) {
+    if (equipment[slot]) equipment[slot] = migriereItemId(equipment[slot])
+  }
+  const damagedItems = {}
+  for (const [id, wert] of Object.entries(gespeichert.damagedItems ?? {})) {
+    if (wert) damagedItems[migriereItemId(id)] = true
+  }
+  const materials = { ...initialState.materials }
+  for (const [sorte, menge] of Object.entries(gespeichert.materials ?? {})) {
+    const ziel = ALTE_MATERIALIEN[sorte] ?? sorte
+    if (ziel in materials) materials[ziel] += menge ?? 0
+  }
+  return {
+    ...gespeichert,
+    inventory,
+    equipment,
+    damagedItems,
+    materials,
+    gender: normalizeGender(gespeichert.gender),
+  }
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return initialState
-    const gespeichert = { ...initialState, ...JSON.parse(raw) }
-    // Altstände mit dem entfernten "d" auf "m" migrieren
-    return { ...gespeichert, gender: normalizeGender(gespeichert.gender) }
+    return migriereSpielstand({ ...initialState, ...JSON.parse(raw) })
   } catch {
     return initialState
   }

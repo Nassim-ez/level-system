@@ -6,11 +6,11 @@ export const RANK_THRESHOLDS = { E: 1, D: 5, C: 10, B: 18, A: 28, S: 40 }
 // Prüfung, um den jeweiligen Rang zu VERLASSEN (Key = aktueller Rang).
 // Die Ziele sind persönlich und werden beim Freischalten berechnet.
 export const RANK_TESTS = {
-  E: { quests: ['liegestuetze'], reward: 'eisenhandschuhe__blau' },
-  D: { quests: ['kniebeugen'], reward: 'laeuferschuhe__blau' },
-  C: { quests: ['klimmzuege'], reward: 'silberkette__blau' },
-  B: { quests: ['liegestuetze'], reward: 'kapuzenumhang__violett' },
-  A: { quests: ['klimmzuege', 'kniebeugen'], reward: 'monarchenring__gold' },
+  E: { quests: ['liegestuetze'], reward: 'eisenhandschuhe__r1' },
+  D: { quests: ['kniebeugen'], reward: 'laeuferschuhe__r1' },
+  C: { quests: ['klimmzuege'], reward: 'silberkette__r2' },
+  B: { quests: ['liegestuetze'], reward: 'kapuzenumhang__r3' },
+  A: { quests: ['klimmzuege', 'kniebeugen'], reward: 'monarchenring__r4' },
 }
 
 // Prüfungsziel = Vielfaches des Tagesziels, mit Mindest- und Höchstwerten

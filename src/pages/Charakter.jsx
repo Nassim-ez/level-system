@@ -4,16 +4,11 @@ import { useGame } from '../context/GameContext.jsx'
 import {
   ITEMS,
   SLOT_LABELS,
-  STUFEN_INFO,
-  MATERIALIEN,
   bonusText,
   debuffText,
-  hochgestuft,
-  aufwertungKosten,
-  reparaturKosten,
-  kostenErfuellt,
-  fehlendeMaterialien,
+  raritaet,
 } from '../data/items.js'
+import Haendler from './Haendler.jsx'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -182,7 +177,7 @@ function SlotBox({
   onSelect,
 }) {
   const stufeFarbe = equippedId
-    ? (STUFEN_INFO[ITEMS[equippedId]?.stufe]?.color ?? 'var(--xp)')
+    ? (raritaet(ITEMS[equippedId])?.color ?? 'var(--xp)')
     : null
   return (
     <g
@@ -411,176 +406,12 @@ function CharakterFigur({ state, selected, onSelect }) {
   )
 }
 
-function Kostenzeile({ kosten, materials }) {
-  const fehlt = fehlendeMaterialien(kosten, materials)
-  return (
-    <span style={{ fontSize: '10px', color: 'var(--dim)' }}>
-      {Object.entries(kosten).map(([mat, menge], i) => (
-        <span key={mat}>
-          {i > 0 && ' · '}
-          <span
-            style={{
-              color: fehlt[mat] ? 'var(--danger)' : 'var(--ok)',
-            }}
-          >
-            {menge} {MATERIALIEN[mat].name}
-          </span>
-          {fehlt[mat] ? ` (−${fehlt[mat]})` : ''}
-        </span>
-      ))}
-    </span>
-  )
-}
-
-function Haendler({ state, dispatch }) {
-  // Alles was der Spieler besitzt: Inventar plus getragene Ausrüstung
-  const besitz = [
-    ...state.inventory,
-    ...Object.values(state.equipment).filter(Boolean),
-  ]
-  const aufwertbar = besitz.filter((id) => ITEMS[id]?.stufe && hochgestuft(id))
-  const beschaedigte = besitz.filter((id) => state.damagedItems?.[id])
-
-  return (
-    <Panel title="HÄNDLER">
-      <div className="mb-3 flex flex-wrap gap-2">
-        {Object.values(MATERIALIEN).map((m) => (
-          <span
-            key={m.id}
-            className="px-2 py-0.5"
-            style={{
-              ...orbitron,
-              fontSize: '9px',
-              color: m.color,
-              border: `1px solid ${m.color}`,
-              borderRadius: '6px',
-            }}
-          >
-            {m.name}: {state.materials?.[m.id] ?? 0}
-          </span>
-        ))}
-      </div>
-
-      {beschaedigte.length > 0 && (
-        <>
-          <p
-            className="mb-2"
-            style={{ ...orbitron, fontSize: '9px', letterSpacing: '2px', color: 'var(--danger)' }}
-          >
-            WIEDERHERSTELLEN
-          </p>
-          <div className="mb-3 flex flex-col gap-2">
-            {beschaedigte.map((id, i) => {
-              const item = ITEMS[id]
-              const ziel = hochgestuft(id)
-              const kosten = ziel ? reparaturKosten(ITEMS[ziel].stufe) : null
-              const machbar = !kosten || kostenErfuellt(kosten, state.materials)
-              return (
-                <div
-                  key={`${id}-${i}`}
-                  className="flex items-center justify-between gap-2 border p-2"
-                  style={{ borderColor: 'var(--danger)', borderRadius: '10px' }}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-semibold">
-                      {item.name}
-                    </p>
-                    {kosten ? (
-                      <Kostenzeile kosten={kosten} materials={state.materials} />
-                    ) : (
-                      <span style={{ fontSize: '10px', color: 'var(--dim)' }}>
-                        kostenlos
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    disabled={!machbar}
-                    onClick={() => dispatch({ type: 'REPAIR_ITEM', itemId: id })}
-                    className="shrink-0 bg-transparent px-2 py-1 disabled:opacity-40"
-                    style={{
-                      ...orbitron,
-                      fontSize: '9px',
-                      letterSpacing: '1px',
-                      color: 'var(--danger)',
-                      border: '1px solid var(--danger)',
-                      borderRadius: '8px',
-                    }}
-                  >
-                    REPARIEREN
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </>
-      )}
-
-      <p
-        className="mb-2"
-        style={{ ...orbitron, fontSize: '9px', letterSpacing: '2px', color: 'var(--glow)' }}
-      >
-        AUFWERTEN
-      </p>
-      {aufwertbar.length === 0 ? (
-        <p style={{ fontSize: '12px', color: 'var(--dim)' }}>
-          Keine Items, die sich weiter aufwerten lassen.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {aufwertbar.map((id, i) => {
-            const item = ITEMS[id]
-            const ziel = hochgestuft(id)
-            const zielItem = ITEMS[ziel]
-            const kosten = aufwertungKosten(zielItem.stufe)
-            const machbar = kostenErfuellt(kosten, state.materials)
-            return (
-              <div
-                key={`${id}-${i}`}
-                className="flex items-center justify-between gap-2 border p-2"
-                style={{ borderColor: 'var(--line)', borderRadius: '10px' }}
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold">
-                    {item.name}{' '}
-                    <span style={{ color: STUFEN_INFO[item.stufe].color }}>
-                      {item.stufe}
-                    </span>
-                    <span style={{ color: 'var(--dim)' }}> → </span>
-                    <span style={{ color: STUFEN_INFO[zielItem.stufe].color }}>
-                      {zielItem.stufe}
-                    </span>
-                  </p>
-                  <Kostenzeile kosten={kosten} materials={state.materials} />
-                </div>
-                <button
-                  type="button"
-                  disabled={!machbar}
-                  onClick={() => dispatch({ type: 'UPGRADE_ITEM', itemId: id })}
-                  className="shrink-0 bg-transparent px-2 py-1 disabled:opacity-40"
-                  style={{
-                    ...orbitron,
-                    fontSize: '9px',
-                    letterSpacing: '1px',
-                    color: 'var(--ok)',
-                    border: '1px solid var(--ok)',
-                    borderRadius: '8px',
-                  }}
-                >
-                  AUFWERTEN
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </Panel>
-  )
-}
-
 function Charakter() {
   const { state, dispatch } = useGame()
   const [selected, setSelected] = useState(null)
+  const [beimHaendler, setBeimHaendler] = useState(false)
+
+  if (beimHaendler) return <Haendler onBack={() => setBeimHaendler(false)} />
 
   const equippedId = selected ? state.equipment[selected] : null
   const equippedItem = equippedId ? ITEMS[equippedId] : null
@@ -695,7 +526,27 @@ function Charakter() {
         </p>
       </Panel>
 
-      <Haendler state={state} dispatch={dispatch} />
+      <Panel title="HÄNDLER">
+        <p style={{ fontSize: '13px', color: 'var(--dim)' }}>
+          Der Schmied im Zwielicht schmilzt Items zu Material und wertet deine
+          Ausrüstung auf.
+        </p>
+        <button
+          type="button"
+          onClick={() => setBeimHaendler(true)}
+          className="mt-3 w-full bg-transparent px-4 py-2.5"
+          style={{
+            ...orbitron,
+            fontSize: '11px',
+            letterSpacing: '2px',
+            color: '#ffb347',
+            border: '1px solid #ffb347',
+            borderRadius: '10px',
+          }}
+        >
+          ZUM HÄNDLER
+        </button>
+      </Panel>
 
       <Panel title="INVENTAR">
         {unequipped.length === 0 ? (
@@ -713,7 +564,7 @@ function Charakter() {
                 <span
                   className="shrink-0"
                   style={{
-                    color: STUFEN_INFO[item.stufe]?.color ?? 'var(--glow)',
+                    color: raritaet(item)?.color ?? 'var(--glow)',
                     fontSize: '14px',
                   }}
                 >
@@ -722,15 +573,15 @@ function Charakter() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold">
                     {item.name}
-                    {item.stufe && (
+                    {raritaet(item) && (
                       <span
                         className="ml-1"
                         style={{
                           fontSize: '10px',
-                          color: STUFEN_INFO[item.stufe].color,
+                          color: raritaet(item).color,
                         }}
                       >
-                        {STUFEN_INFO[item.stufe].name}
+                        {raritaet(item).name}
                       </span>
                     )}
                   </p>

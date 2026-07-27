@@ -34,6 +34,14 @@ export function auraStage(aura, level) {
   return stage
 }
 
+// Aura-Bonus auf die Blockchance, in Prozentpunkten je Quoten-Stufe
+export const AURA_BLOCK_BONUS = [0, 2, 4, 6, 8, 10]
+
+export function auraBlockBonus(aura, level) {
+  const stufe = auraStage(aura, level)
+  return AURA_BLOCK_BONUS[AURA_STAGES.indexOf(stufe)] ?? 0
+}
+
 // Wirkung gestaffelt nach Rangverhältnis: voller Bonus unter dem eigenen
 // Rang, halber bei gleichem Rang, keiner darüber – egal ob Boss oder nicht.
 export function auraDamageBonus(aura, level, ownRank, enemyRank) {
