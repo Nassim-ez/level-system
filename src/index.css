@@ -438,6 +438,16 @@ h4 {
   }
 }
 
+.kachel-flash {
+  animation: kachelflash 0.7s;
+}
+@keyframes kachelflash {
+  35% {
+    transform: scale(1.12);
+    filter: brightness(2.1);
+  }
+}
+
 .tag-w,
 .tag-r {
   display: inline-block;
