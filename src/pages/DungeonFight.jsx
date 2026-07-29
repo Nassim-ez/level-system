@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../context/GameContext.jsx'
 import FightSprite from '../components/FightSprites.jsx'
 import { findDungeon } from '../data/dungeons.js'
-import { ITEMS, MATERIALIEN, raritaet } from '../data/items.js'
+import { ITEMS, MATERIALIEN, raritaet, summiereEffekte } from '../data/items.js'
 import { zieheDrops } from '../data/loot.js'
 import { auraDamageBonus, auraStage } from '../data/aura.js'
 import {
   ANGRIFFE,
   ARTEN,
   MAX_VITALITAET,
+  maxVitalitaet,
+  belastungMit,
+  heilMenge,
   MAX_HEILUNGEN,
   HEILUNG_ANTEIL,
   BELASTUNG_LABELS,
@@ -39,10 +42,11 @@ const STAUB = [
   { left: '86%', dauer: 9.8, delay: 5.2, farbe: 'rgba(255,107,120,.35)' },
 ]
 
-function neuerKampf(tuer) {
+function neuerKampf(tuer, maxVit = MAX_VITALITAET) {
   return {
     nr: tuer.nr,
-    vitalitaet: MAX_VITALITAET,
+    maxVit,
+    vitalitaet: maxVit,
     belastung: 0,
     heilungen: MAX_HEILUNGEN,
     enemyHp: tuer.hp,
@@ -86,8 +90,10 @@ function DungeonFight({ onExit }) {
   const dungeon = findDungeon(state.dungeon.run)
   const tuer = dungeon?.tueren.find((t) => t.nr === state.dungeon.door)
 
+  const effekte = summiereEffekte(state.equipment)
+  const maxVit = maxVitalitaet(effekte)
   const [k, setK] = useState(
-    () => state.dungeon.fight ?? (tuer ? neuerKampf(tuer) : null),
+    () => state.dungeon.fight ?? (tuer ? neuerKampf(tuer, maxVit) : null),
   )
   const [pAnim, setPAnim] = useState('')
   const [eAnim, setEAnim] = useState('')
@@ -109,7 +115,8 @@ function DungeonFight({ onExit }) {
       setK((alt) => ({
         ...alt,
         gerastet: false,
-        vitalitaet: MAX_VITALITAET,
+        maxVit,
+        vitalitaet: maxVit,
         belastung: 0,
         heilungen: MAX_HEILUNGEN,
         block: 'offen',
@@ -118,7 +125,7 @@ function DungeonFight({ onExit }) {
         log: ['Du hast gerastet. Der Gegner hat sich erholt.'],
       }))
     }
-  }, [k?.gerastet])
+  }, [k?.gerastet, maxVit])
 
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
 
@@ -149,6 +156,7 @@ function DungeonFight({ onExit }) {
   const blockDetail = blockChanceDetail(tuer, {
     level: state.level,
     aura: state.aura,
+    effekte,
   })
   const kampfVorbei = !!popup || !!k.beendet
   const auraStufe = auraStage(state.aura, state.level)
@@ -256,6 +264,7 @@ function DungeonFight({ onExit }) {
         auraBonus,
         combo: neu.combo,
         fluch: neu.fluch,
+        effekte,
       })
       if (neu.fluch > 0) neu.fluch -= 1
 
@@ -277,7 +286,7 @@ function DungeonFight({ onExit }) {
         // Kammer geräumt
         anim('e', 'die', 1100)
         neu.beendet = 'sieg'
-        const drops = zieheDrops(dungeon.id, state.rank, tuer.boss ? 2 : 1)
+        const drops = zieheDrops(dungeon.id, state.rank, tuer.boss ? 2 : 1, Math.random, effekte)
         timers.current.push(setTimeout(() => setPopup({ art: 'sieg', drops }), 900))
         return neu
       }
@@ -294,7 +303,7 @@ function DungeonFight({ onExit }) {
       const haelt = Math.random() < blockDetail.chance
       let neu = {
         ...kk,
-        belastung: kk.belastung + BELASTUNG_BLOCK,
+        belastung: kk.belastung + belastungMit(BELASTUNG_BLOCK, effekte),
         block: haelt ? 'gehalten' : 'gebrochen',
       }
       anim('p', 'brace', 500)
@@ -316,12 +325,12 @@ function DungeonFight({ onExit }) {
         return { ...kk, log: nachricht('Keine Kraft mehr zum Regenerieren.', 'bad', kk) }
       }
       const eff = HEILUNG_ANTEIL[belastungsStufe(kk.belastung)]
-      const h = Math.round(MAX_VITALITAET * eff)
+      const h = heilMenge(eff, kk.maxVit ?? maxVit, effekte)
       let neu = {
         ...kk,
         heilungen: kk.heilungen - 1,
-        vitalitaet: Math.min(MAX_VITALITAET, kk.vitalitaet + h),
-        belastung: kk.belastung + BELASTUNG_HEILEN,
+        vitalitaet: Math.min(kk.maxVit ?? maxVit, kk.vitalitaet + h),
+        belastung: kk.belastung + belastungMit(BELASTUNG_HEILEN, effekte),
       }
       fliegen(`+${h}`, 'crit', false)
       neu.log = nachricht(
@@ -430,17 +439,17 @@ function DungeonFight({ onExit }) {
             </div>
             <Leiste
               wert={k.vitalitaet}
-              max={MAX_VITALITAET}
+              max={k.maxVit ?? maxVit}
               mine
               farbe={
-                k.vitalitaet <= MAX_VITALITAET * 0.3
+                k.vitalitaet <= (k.maxVit ?? maxVit) * 0.3
                   ? 'linear-gradient(90deg,#8b1a28,#ff4d5e)'
                   : 'linear-gradient(90deg,#2e7fd4,#8fe0ff)'
               }
               glow="0 0 9px rgba(63,182,255,.4)"
             />
             <div style={{ ...orbitron, fontSize: '8.5px', color: 'var(--dim)', marginTop: 3 }}>
-              {k.vitalitaet} / {MAX_VITALITAET} VIT
+              {k.vitalitaet} / {k.maxVit ?? maxVit} VIT
             </div>
           </div>
 
@@ -763,9 +772,19 @@ function DungeonFight({ onExit }) {
               {blockDetail.aura >= 0 ? '+' : ''}
               {blockDetail.aura} · Level{' '}
               {blockDetail.level >= 0 ? '+' : ''}
-              {blockDetail.level} ={' '}
+              {blockDetail.level}
+              {blockDetail.ausruestung !== 0 && (
+                <>
+                  {' '}· Ausrüstung {blockDetail.ausruestung >= 0 ? '+' : ''}
+                  {blockDetail.ausruestung}
+                </>
+              )}{' '}
+              ={' '}
               <span style={{ color: 'var(--glow)' }}>{blockDetail.gesamt}%</span>
-              {blockDetail.basis + blockDetail.aura + blockDetail.level !==
+              {blockDetail.basis +
+                blockDetail.aura +
+                blockDetail.level +
+                blockDetail.ausruestung !==
                 blockDetail.gesamt && ' (Grenze)'}
             </p>
             <b style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px', color: 'var(--dim)', display: 'block', marginTop: 12 }}>

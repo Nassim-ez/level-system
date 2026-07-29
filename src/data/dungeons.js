@@ -213,7 +213,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ],
-    drop: 'trainingsguertel__r0',
+    drop: 'hose_e1',
   },
   {
     id: 'nebelwald',
@@ -314,7 +314,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ],
-    drop: 'laeuferschuhe__r0',
+    drop: 'schu_e1',
   },
 ]
 

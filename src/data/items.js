@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Raritäten – sechs Stufen, Index 0..5 (Werte aus haendler-mockup.html)
+// Raritäten – sechs Stufen, Index 0..5 (Farben aus haendler-mockup.html)
 // ---------------------------------------------------------------------------
 export const RARITAETEN = [
   { name: 'Gewöhnlich', color: '#93a4bd', rgb: '147,164,189' },
@@ -43,7 +43,6 @@ export const MATERIALIEN = {
   wolf: { id: 'wolf', name: 'Wolfsfell', color: '#c98a5b' },
 }
 
-// Welche Gegnerart welches Material hinterlässt
 export const SPRITE_MATERIAL = {
   kobold: 'basalt',
   koloss: 'basalt',
@@ -58,165 +57,149 @@ export function materialFuerSprite(sprite) {
 }
 
 // ---------------------------------------------------------------------------
-// Item-Vorlagen. Jede Rarität wird daraus als eigene Variante erzeugt.
-// material = Sorte, die beim Schmelzen anfällt bzw. zum Aufwerten nötig ist.
+// Item-Katalog bis C-Rang (24 Items, drei je Slot, Raritäten 0–2)
+// Effekte in Prozent, negativ = Debuff:
+//   dmgKraft, dmgCore, dmgAusdauer, dmgTempo, dmgAll – Schaden je Angriffsart
+//   vit   – maximale Vitalität
+//   block – Blockchance (Prozentpunkte)
+//   luck  – Glücksfund-Chance beim Loot
+//   load  – Belastungszuwachs je Aktion (negativ = weniger Belastung)
+//   heal  – Wirkung von Dehnen/Heilen
 // ---------------------------------------------------------------------------
-const VORLAGEN = {
-  ring_schnelligkeit: {
-    basisName: 'Ring der Schnelligkeit',
-    slot: 'ring',
-    material: 'schatten',
-    beschreibung: 'Der Ring treibt jede Bewegung an.',
-    bonus: { typ: 'stat', stat: 'AGI' },
-    werte: [15, 30, 40, 50, 62, 75],
-  },
-  leichtgewicht_armband: {
-    basisName: 'Leichtgewicht-Armband',
-    slot: 'kette',
-    material: 'schatten',
-    beschreibung: 'Extrem leicht – gut für Tempo, schlecht für rohe Kraft.',
-    bonus: { typ: 'stat', stat: 'AGI' },
-    werte: [10, 20, 30, 40, 52, 65],
-    debuff: { typ: 'stat', stat: 'STR', werte: [5, 5, 4, 3, 3, 2] },
-  },
-  sprintschuhe: {
-    basisName: 'Sprint-Schuhe',
-    slot: 'schuhe',
-    material: 'wolf',
-    beschreibung: 'Perfekt für schnelle Bewegungen, wackelig bei schweren Lasten.',
-    bonus: { typ: 'stat', stat: 'AGI' },
-    werte: [12, 22, 32, 45, 58, 72],
-    debuff: { typ: 'stat', stat: 'STR', werte: [4, 4, 3, 2, 2, 1] },
-  },
-  eisenhandschuhe: {
-    basisName: 'Eisenhandschuhe',
-    slot: 'waffe',
-    material: 'basalt',
-    beschreibung: 'Schwere Handschuhe aus Eisen.',
-    bonus: { typ: 'xp', stat: 'STR' },
-    werte: [5, 9, 14, 20, 27, 35],
-  },
-  laeuferschuhe: {
-    basisName: 'Läuferschuhe',
-    slot: 'schuhe',
-    material: 'wolf',
-    beschreibung: 'Federleicht und schnell.',
-    bonus: { typ: 'xp', stat: 'AGI' },
-    werte: [6, 10, 15, 22, 30, 38],
-  },
-  silberkette: {
-    basisName: 'Silberkette',
-    slot: 'kette',
-    material: 'knochen',
-    beschreibung: 'Stärkt die Lebenskraft.',
-    bonus: { typ: 'xp', stat: 'VIT' },
-    werte: [6, 10, 15, 22, 30, 38],
-  },
-  kapuzenumhang: {
-    basisName: 'Kapuzenumhang',
-    slot: 'umhang',
-    material: 'schatten',
-    beschreibung: 'Umhang eines wahren Jägers.',
-    bonus: { typ: 'xp' },
-    werte: [5, 10, 14, 20, 26, 33],
-  },
-  monarchenring: {
-    basisName: 'Monarchen-Ring',
-    slot: 'ring',
-    material: 'schatten',
-    beschreibung: 'Das Zeichen eines Monarchen.',
-    bonus: { typ: 'xp' },
-    werte: [7, 12, 18, 25, 32, 40],
-  },
-  trainingsguertel: {
-    basisName: 'Trainingsgürtel',
-    slot: 'hose',
-    material: 'wolf',
-    beschreibung: 'Stabilisiert jede Bewegung.',
-    bonus: { typ: 'xp' },
-    werte: [4, 8, 12, 18, 24, 30],
-  },
-  jaegerhelm: {
-    basisName: 'Jägerhelm',
-    slot: 'helm',
-    material: 'knochen',
-    beschreibung: 'Schärft die Sinne.',
-    bonus: { typ: 'xp' },
-    werte: [5, 9, 13, 19, 25, 32],
-  },
-  frostpanzer: {
-    basisName: 'Frostpanzer',
-    slot: 'brust',
-    material: 'basalt',
-    beschreibung: 'Kalt, hart, unzerbrechlich.',
-    bonus: { typ: 'xp' },
-    werte: [6, 11, 16, 23, 30, 38],
-  },
-  daemonenklinge: {
-    basisName: 'Dämonenklinge',
-    slot: 'waffe',
-    material: 'schatten',
-    beschreibung: 'Flüstert im Dunkeln.',
-    bonus: { typ: 'xp' },
-    werte: [7, 12, 18, 26, 34, 42],
-  },
-  monarchenkrone: {
-    basisName: 'Monarchenkrone',
-    slot: 'helm',
-    material: 'knochen',
-    beschreibung: 'Die Krone des Herrschers.',
-    bonus: { typ: 'xp' },
-    werte: [8, 14, 20, 30, 39, 48],
-  },
-  holzschwert: {
-    basisName: 'Holzschwert',
-    slot: 'waffe',
-    material: 'basalt',
-    beschreibung: 'Ein einfaches Übungsschwert für angehende Jäger.',
-    bonus: { typ: 'xp', stat: 'STR' },
-    werte: [5, 8, 12, 17, 22, 28],
-  },
+export const KATALOG = [
+  // HELM
+  { id: 'helm_e1', slot: 'helm', name: 'Kobold-Kappe', rarity: 0, mat: 'knochen',
+    effects: { vit: 4 } },
+  { id: 'helm_d1', slot: 'helm', name: 'Kapuze des Spähers', rarity: 1, mat: 'schatten',
+    effects: { dmgAusdauer: 8, dmgKraft: -4 } },
+  { id: 'helm_c1', slot: 'helm', name: 'Helm des Knochenvogts', rarity: 2, mat: 'knochen',
+    effects: { dmgCore: 12, dmgTempo: -5 } },
+
+  // KETTE
+  { id: 'kett_e1', slot: 'kette', name: 'Amulett der Ruhe', rarity: 0, mat: 'knochen',
+    effects: { heal: 6 } },
+  { id: 'kett_d1', slot: 'kette', name: 'Knochensplitter-Amulett', rarity: 1, mat: 'knochen',
+    effects: { dmgCore: 8, vit: -3 } },
+  { id: 'kett_c1', slot: 'kette', name: 'Wolfszahn-Kette', rarity: 2, mat: 'wolf',
+    effects: { vit: 14, dmgTempo: -6 } },
+
+  // UMHANG
+  { id: 'umha_e1', slot: 'umhang', name: 'Zerschlissener Mantel', rarity: 0, mat: 'schatten',
+    effects: { luck: 4 } },
+  { id: 'umha_d1', slot: 'umhang', name: 'Umhang der Stille', rarity: 1, mat: 'schatten',
+    effects: { luck: 9, vit: -4 } },
+  { id: 'umha_c1', slot: 'umhang', name: 'Nebelmantel', rarity: 2, mat: 'schatten',
+    effects: { luck: 14, block: -6 } },
+
+  // BRUST
+  { id: 'brus_e1', slot: 'brust', name: 'Lederwams', rarity: 0, mat: 'wolf',
+    effects: { block: 5 } },
+  { id: 'brus_d1', slot: 'brust', name: 'Bandagen des Ausdauernden', rarity: 1, mat: 'knochen',
+    effects: { load: -8, dmgAll: -4 } },
+  { id: 'brus_c1', slot: 'brust', name: 'Basaltpanzer', rarity: 2, mat: 'basalt',
+    effects: { block: 15, dmgTempo: -7 } },
+
+  // WAFFE
+  { id: 'waff_e1', slot: 'waffe', name: 'Übungsstab', rarity: 0, mat: 'basalt',
+    effects: { dmgKraft: 5 } },
+  { id: 'waff_d1', slot: 'waffe', name: 'Skelettklinge', rarity: 1, mat: 'knochen',
+    effects: { dmgKraft: 9, dmgAusdauer: -4 } },
+  { id: 'waff_c1', slot: 'waffe', name: 'Splitterhammer des Kolosses', rarity: 2, mat: 'basalt',
+    effects: { dmgKraft: 15, dmgTempo: -7 } },
+
+  // RING
+  { id: 'ring_e1', slot: 'ring', name: 'Schlichter Reif', rarity: 0, mat: 'basalt',
+    effects: { dmgTempo: 4 } },
+  { id: 'ring_d1', slot: 'ring', name: 'Ring der Schnelligkeit', rarity: 1, mat: 'schatten',
+    effects: { dmgTempo: 9, dmgKraft: -4 } },
+  { id: 'ring_c1', slot: 'ring', name: 'Siegel des Rudelführers', rarity: 2, mat: 'wolf',
+    effects: { dmgAll: 13, block: -8 } },
+
+  // HOSE
+  { id: 'hose_e1', slot: 'hose', name: 'Grobe Beinlinge', rarity: 0, mat: 'wolf',
+    effects: { dmgAusdauer: 4 } },
+  { id: 'hose_d1', slot: 'hose', name: 'Läuferhose', rarity: 1, mat: 'wolf',
+    effects: { dmgAusdauer: 9, dmgCore: -4 } },
+  { id: 'hose_c1', slot: 'hose', name: 'Schattengewebte Hose', rarity: 2, mat: 'schatten',
+    effects: { dmgAusdauer: 13, vit: -6 } },
+
+  // SCHUHE
+  { id: 'schu_e1', slot: 'schuhe', name: 'Abgetragene Stiefel', rarity: 0, mat: 'knochen',
+    effects: { dmgTempo: 4 } },
+  { id: 'schu_d1', slot: 'schuhe', name: 'Aschesohlen', rarity: 1, mat: 'basalt',
+    effects: { dmgTempo: 10, block: -5 } },
+  { id: 'schu_c1', slot: 'schuhe', name: 'Pfoten des Rudels', rarity: 2, mat: 'wolf',
+    effects: { dmgTempo: 14, dmgKraft: -6 } },
+]
+
+// Anzeigetexte für die UI
+export const EFFECT_LABEL = {
+  dmgKraft: 'Kraft-Schaden',
+  dmgCore: 'Core-Schaden',
+  dmgAusdauer: 'Ausdauer-Schaden',
+  dmgTempo: 'Tempo-Schaden',
+  dmgAll: 'Schaden gesamt',
+  vit: 'Vitalität',
+  block: 'Blockchance',
+  luck: 'Glücksfund-Chance',
+  load: 'Belastung je Aktion',
+  heal: 'Heilwirkung',
 }
 
-// Item-ID einer Variante: "<vorlage>__r<rarität>"
-export function variantId(vorlage, rar) {
-  return `${vorlage}__r${rar}`
+// Beim Aufwerten wachsen die Vorteile, die Nachteile bleiben wie sie sind
+export const AUFWERT_FAKTOR = 1.5
+
+// Item-ID einer aufgewerteten Ausführung: "<id>+<stufen>"
+export function variantId(basisId, stufen) {
+  return stufen > 0 ? `${basisId}+${stufen}` : basisId
+}
+
+function skaliere(effects, stufen) {
+  if (stufen <= 0) return { ...effects }
+  const out = {}
+  for (const [key, wert] of Object.entries(effects)) {
+    if (wert > 0) {
+      out[key] = Math.round(wert * Math.pow(AUFWERT_FAKTOR, stufen))
+    } else {
+      out[key] = wert // Nachteile skalieren nicht mit
+    }
+  }
+  return out
 }
 
 function baueItems() {
   const items = {}
-  for (const [key, v] of Object.entries(VORLAGEN)) {
-    for (let rar = 0; rar <= MAX_RARITAET; rar++) {
-      const id = variantId(key, rar)
+  for (const eintrag of KATALOG) {
+    const maxStufen = MAX_RARITAET - eintrag.rarity
+    for (let s = 0; s <= maxStufen; s++) {
+      const rar = eintrag.rarity + s
+      const id = variantId(eintrag.id, s)
       items[id] = {
         id,
-        vorlage: key,
-        basisName: v.basisName,
-        name: v.basisName,
-        slot: v.slot,
-        material: v.material,
+        basisId: eintrag.id,
+        stufen: s,
+        name: eintrag.name,
+        basisName: eintrag.name,
+        slot: eintrag.slot,
+        material: eintrag.mat,
         rar,
-        beschreibung: v.beschreibung,
-        bonus: { ...v.bonus, wert: v.werte[rar] },
-        debuff: v.debuff
-          ? { typ: v.debuff.typ, stat: v.debuff.stat, wert: v.debuff.werte[rar] }
-          : null,
+        effects: skaliere(eintrag.effects, s),
       }
     }
   }
   items.serienschutz = {
     id: 'serienschutz',
-    vorlage: 'serienschutz',
-    basisName: 'Serienschutz-Stein',
+    basisId: 'serienschutz',
+    stufen: 0,
     name: 'Serienschutz-Stein',
+    basisName: 'Serienschutz-Stein',
     slot: null,
     material: 'basalt',
     rar: null,
     verbrauchbar: true,
     beschreibung:
       'Rettet die Tagesserie bei einem Fehltag. Wird automatisch verbraucht.',
-    bonus: null,
-    debuff: null,
+    effects: {},
   }
   return items
 }
@@ -224,34 +207,80 @@ function baueItems() {
 export const ITEMS = baueItems()
 
 // ---------------------------------------------------------------------------
-// Migration alter Spielstände: "__grau" … "__gold" → "__r0" … "__r3"
+// Wirksame Effekte der getragenen Ausrüstung, aufsummiert
+// ---------------------------------------------------------------------------
+export function summiereEffekte(equipment) {
+  const summe = {}
+  for (const id of Object.values(equipment ?? {})) {
+    const item = ITEMS[id]
+    if (!item?.effects) continue
+    for (const [key, wert] of Object.entries(item.effects)) {
+      summe[key] = (summe[key] ?? 0) + wert
+    }
+  }
+  return summe
+}
+
+// ---------------------------------------------------------------------------
+// Migration: alte Varianten-IDs auf den neuen Katalog abbilden
 // ---------------------------------------------------------------------------
 const ALTE_STUFEN = { grau: 0, blau: 1, violett: 2, gold: 3 }
+// Slot der früheren Vorlagen, um passenden Ersatz zu finden
+const ALTE_SLOTS = {
+  ring_schnelligkeit: 'ring',
+  leichtgewicht_armband: 'kette',
+  sprintschuhe: 'schuhe',
+  eisenhandschuhe: 'waffe',
+  laeuferschuhe: 'schuhe',
+  silberkette: 'kette',
+  kapuzenumhang: 'umhang',
+  monarchenring: 'ring',
+  trainingsguertel: 'hose',
+  jaegerhelm: 'helm',
+  frostpanzer: 'brust',
+  daemonenklinge: 'waffe',
+  monarchenkrone: 'helm',
+  holzschwert: 'waffe',
+}
+
+// Ersatz mit gleichem Slot und möglichst gleicher Rarität
+function ersatzFuer(slot, rar) {
+  const kandidaten = KATALOG.filter((k) => k.slot === slot)
+  if (kandidaten.length === 0) return null
+  const treffer =
+    kandidaten.find((k) => k.rarity === Math.min(rar, 2)) ?? kandidaten[0]
+  const stufen = Math.max(0, Math.min(MAX_RARITAET, rar) - treffer.rarity)
+  return variantId(treffer.id, stufen)
+}
 
 export function migriereItemId(id) {
   if (!id || typeof id !== 'string') return id
   if (ITEMS[id]) return id
-  const treffer = id.match(/^(.+)__(grau|blau|violett|gold)$/)
-  if (treffer) {
-    const neu = variantId(treffer[1], ALTE_STUFEN[treffer[2]])
-    return ITEMS[neu] ? neu : id
+
+  // "<vorlage>__r<n>" oder "<vorlage>__grau" …
+  const m = id.match(/^(.+?)__(?:r(\d)|(grau|blau|violett|gold))$/)
+  if (m) {
+    const vorlage = m[1]
+    const rar = m[2] != null ? Number(m[2]) : ALTE_STUFEN[m[3]]
+    const slot = ALTE_SLOTS[vorlage]
+    if (slot) return ersatzFuer(slot, rar) ?? id
   }
-  // Ganz alte IDs ohne Stufe (z. B. "holzschwert")
-  const basis = variantId(id, 0)
-  return ITEMS[basis] ? basis : id
+  // Ganz alte IDs ohne Stufe
+  if (ALTE_SLOTS[id]) return ersatzFuer(ALTE_SLOTS[id], 0) ?? id
+  return id
 }
 
 // ---------------------------------------------------------------------------
 export function hochgestuft(itemId) {
   const item = ITEMS[itemId]
   if (!item || item.rar == null || item.rar >= MAX_RARITAET) return null
-  return variantId(item.vorlage, item.rar + 1)
+  return variantId(item.basisId, item.stufen + 1)
 }
 
 export function herabgestuft(itemId) {
   const item = ITEMS[itemId]
-  if (!item || item.rar == null || item.rar <= 0) return null
-  return variantId(item.vorlage, item.rar - 1)
+  if (!item || item.rar == null || item.stufen <= 0) return null
+  return variantId(item.basisId, item.stufen - 1)
 }
 
 export const SLOTS = [
@@ -276,18 +305,23 @@ export const SLOT_LABELS = {
   schuhe: 'SCHUHE',
 }
 
-export function bonusText(item) {
-  if (!item?.bonus) return null
-  const { typ, stat, wert } = item.bonus
-  if (typ === 'xp') return `+${wert}% ${stat ? `${stat}-` : ''}XP`
-  return `+${wert} ${stat}`
+// Effekte als Liste, Vorteile zuerst
+export function effektListe(item) {
+  if (!item?.effects) return []
+  return Object.entries(item.effects)
+    .map(([key, wert]) => ({
+      key,
+      wert,
+      label: EFFECT_LABEL[key] ?? key,
+      text: `${wert > 0 ? '+' : '−'}${Math.abs(wert)}% ${EFFECT_LABEL[key] ?? key}`,
+    }))
+    .sort((a, b) => b.wert - a.wert)
 }
 
-export function debuffText(item) {
-  if (!item?.debuff) return null
-  const { typ, stat, wert } = item.debuff
-  if (typ === 'xp') return `−${wert}% ${stat ? `${stat}-` : ''}XP`
-  return `−${wert} ${stat}`
+export function effektText(item) {
+  return effektListe(item)
+    .map((e) => e.text)
+    .join(' · ')
 }
 
 export function raritaet(item) {

@@ -9,8 +9,7 @@ import {
   schmelzErtrag,
   rangObergrenze,
   hochgestuft,
-  bonusText,
-  debuffText,
+  effektListe,
   raritaet,
 } from '../data/items.js'
 
@@ -270,6 +269,25 @@ function Zeile({ item, rechts, unterzeile, beschaedigt, gone, blitzt, refCb }) {
   )
 }
 
+// Effekte farbig: Vorteile in var(--xp), Nachteile in var(--danger)
+function Effekte({ item }) {
+  const liste = effektListe(item)
+  if (liste.length === 0) return null
+  return (
+    <span>
+      {liste.map((e, i) => (
+        <span key={e.key}>
+          {i > 0 && <span style={{ color: 'var(--dim)' }}> · </span>}
+          <span style={{ color: e.wert > 0 ? 'var(--xp)' : 'var(--danger)' }}>
+            {e.wert > 0 ? '+' : '−'}
+            {Math.abs(e.wert)}% {e.label}
+          </span>
+        </span>
+      ))}
+    </span>
+  )
+}
+
 function Knopf({ text, onClick, aus, fix }) {
   return (
     <button
@@ -456,7 +474,13 @@ function Haendler({ onBack }) {
                   beschaedigt={!!state.damagedItems?.[id]}
                   gone={gone === id}
                   refCb={(el) => (zeilenRefs.current[id] = el)}
-                  unterzeile={`${schmelzErtrag(item.rar)} × ${MATERIALIEN[item.material].name}`}
+                  unterzeile={
+                    <>
+                      {schmelzErtrag(item.rar)} × {MATERIALIEN[item.material].name}
+                      <br />
+                      <Effekte item={item} />
+                    </>
+                  }
                   rechts={
                     <Knopf
                       text={`+${schmelzErtrag(item.rar)}`}
@@ -470,7 +494,13 @@ function Haendler({ onBack }) {
                   key={`eq-${slot}`}
                   item={item}
                   beschaedigt={!!state.damagedItems?.[id]}
-                  unterzeile={`Getragen · ${SLOT_LABELS[slot]}`}
+                  unterzeile={
+                    <>
+                      Getragen · {SLOT_LABELS[slot]}
+                      <br />
+                      <Effekte item={item} />
+                    </>
+                  }
                   rechts={<Knopf text="AUSGERÜSTET" aus />}
                 />
               ))}
@@ -513,9 +543,11 @@ function Haendler({ onBack }) {
               }
 
               const unterzeile =
-                amMax || !ziel
-                  ? `${bonusText(item)}${item.debuff ? ` · ${debuffText(item)}` : ''}`
-                  : `${beschaedigt ? 'Wiederherstellen · ' : ''}${raritaet(ITEMS[ziel])?.name} · ${kosten} × ${MATERIALIEN[item.material].name}`
+                amMax || !ziel ? (
+                  <Effekte item={item} />
+                ) : (
+                  `${beschaedigt ? 'Wiederherstellen · ' : ''}${raritaet(ITEMS[ziel])?.name} · ${kosten} × ${MATERIALIEN[item.material].name}`
+                )
 
               return (
                 <Zeile

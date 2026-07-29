@@ -1,5 +1,13 @@
 import { auraBlockBonus } from './aura.js'
 
+// Angriffsart → Effekt-Schlüssel der Ausrüstung
+export const ART_EFFEKT = {
+  kraft: 'dmgKraft',
+  core: 'dmgCore',
+  ausdauer: 'dmgAusdauer',
+  tempo: 'dmgTempo',
+}
+
 // ---------------------------------------------------------------------------
 // Kampfsystem der Tür-Dungeons. Mechanik und Werte 1:1 aus dungeon-mockup.html,
 // ergänzt um die beiden eigenen Regeln dieses Projekts:
@@ -47,6 +55,12 @@ export const BELASTUNG_LABELS = ['100%', '50%', '25%']
 
 // Spielerwerte
 export const MAX_VITALITAET = 100
+
+// Wirksame Maximal-Vitalität mit dem vit-Effekt der Ausrüstung
+export function maxVitalitaet(effekte) {
+  const vit = effekte?.vit ?? 0
+  return Math.max(20, Math.round(MAX_VITALITAET * (1 + vit / 100)))
+}
 export const MAX_HEILUNGEN = 3
 // Heilung in Anteilen der Maximal-Vitalität, je Belastungsstufe
 export const HEILUNG_ANTEIL = [0.25, 0.15, 0.08]
@@ -79,12 +93,15 @@ export function blockChanceDetail(gegner, spieler) {
   const level = Math.round(
     Math.max(-LEVEL_GRENZE, Math.min(LEVEL_GRENZE, roh)),
   )
-  const summe = basis + aura + level
+  // Ausrüstung wirkt in Prozentpunkten auf die Blockchance
+  const ausruestung = spieler?.effekte?.block ?? 0
+  const summe = basis + aura + level + ausruestung
   const gesamt = Math.max(BLOCK_MIN * 100, Math.min(BLOCK_MAX * 100, summe))
   return {
     basis: Math.round(basis),
     aura,
     level: Math.round(level),
+    ausruestung: Math.round(ausruestung),
     gesamt: Math.round(gesamt),
     chance: gesamt / 100,
   }
@@ -144,6 +161,7 @@ export function berechneSchaden({
   auraBonus = 0,
   combo = 1,
   fluch = 0,
+  effekte = {},
 }) {
   const basis = angriff.basis
   const f = belastungsFaktor(belastung)
@@ -152,11 +170,33 @@ export function berechneSchaden({
   if (fluch > 0) mul *= FLUCH_FAKTOR
   mul *= RANG_FAKTOR[rank] ?? 1
   mul *= 1 + auraBonus / 100
+  // Ausrüstung: Aufschlag der passenden Art plus dmgAll
+  const artBonus = effekte[ART_EFFEKT[angriff.art]] ?? 0
+  const alleBonus = effekte.dmgAll ?? 0
+  mul *= 1 + (artBonus + alleBonus) / 100
+  // Belastung je Aktion, durch load beeinflusst
+  const last = Math.max(
+    1,
+    Math.round(basis * (1 + (effekte.load ?? 0) / 100)),
+  )
   return {
     schaden: Math.max(1, Math.round(basis * mul * f)),
-    stark: mul > (RANG_FAKTOR[rank] ?? 1),
-    belastung: basis,
+    stark: artBonus + alleBonus > 0 || mul > (RANG_FAKTOR[rank] ?? 1),
+    belastung: last,
   }
+}
+
+// Belastungskosten einer Reaktion mit dem load-Effekt
+export function belastungMit(basis, effekte) {
+  return Math.max(1, Math.round(basis * (1 + (effekte?.load ?? 0) / 100)))
+}
+
+// Heilmenge mit dem heal-Effekt
+export function heilMenge(anteil, maxVit, effekte) {
+  return Math.max(
+    1,
+    Math.round(maxVit * anteil * (1 + (effekte?.heal ?? 0) / 100)),
+  )
 }
 
 /**

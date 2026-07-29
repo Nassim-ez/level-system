@@ -21,6 +21,7 @@ import {
   rangObergrenze,
   migriereItemId,
   raritaet,
+  summiereEffekte,
 } from '../data/items.js'
 import { zieheDrops, materialName } from '../data/loot.js'
 import {
@@ -59,7 +60,7 @@ const initialState = {
     hose: null,
     schuhe: null,
   },
-  inventory: ['holzschwert__r0', 'serienschutz'],
+  inventory: ['waff_e1', 'serienschutz'],
   rankTestActive: false,
   rankTestTasks: null, // beim Freischalten eingefrorene Prüfungsziele
   aura: 0,
@@ -118,41 +119,11 @@ function withLog(log, text, extra = {}) {
   return [{ datum: todayKey(), text, ...extra }, ...log].slice(0, 50)
 }
 
-// Effektive Stats: Basis plus Item-Boni minus Debuffs
-export function effectiveStats(state) {
-  const stats = { ...state.stats }
-  for (const itemId of Object.values(state.equipment)) {
-    const item = ITEMS[itemId]
-    if (!item) continue
-    if (item.bonus?.typ === 'stat' && item.bonus.stat) {
-      stats[item.bonus.stat] = (stats[item.bonus.stat] ?? 0) + item.bonus.wert
-    }
-    if (item.debuff?.typ === 'stat' && item.debuff.stat) {
-      stats[item.debuff.stat] = Math.max(
-        0,
-        (stats[item.debuff.stat] ?? 0) - item.debuff.wert,
-      )
-    }
-  }
-  return stats
-}
-
+// XP-Bonus kommt seit dem Katalog bis C-Rang nur noch von der Klasse;
+// die Ausrüstung wirkt im Kampf statt auf die XP.
 function xpMultiplier(state, stat) {
-  let pct = 0
-  for (const itemId of Object.values(state.equipment)) {
-    if (!itemId) continue
-    const item = ITEMS[itemId]
-    const bonus = item?.bonus
-    if (bonus?.typ === 'xp' && (!bonus.stat || bonus.stat === stat)) {
-      pct += bonus.wert
-    }
-    const debuff = item?.debuff
-    if (debuff?.typ === 'xp' && (!debuff.stat || debuff.stat === stat)) {
-      pct -= debuff.wert
-    }
-  }
   const klasse = state.klasse ? CLASSES[state.klasse] : null
-  if (klasse && (!klasse.stat || klasse.stat === stat)) pct += klasse.wert
+  const pct = klasse && (!klasse.stat || klasse.stat === stat) ? klasse.wert : 0
   return 1 + pct / 100
 }
 
@@ -441,7 +412,15 @@ function reducer(state, action) {
       const progress = { ...state.dungeon.progress, [tuer.nr]: true }
       const killed = state.dungeon.killed + tuer.anzahl
       // Beute: eine Tür gibt einen Drop, der Boss zwei
-      const drops = action.drops ?? zieheDrops(dungeon.id, state.rank, tuer.boss ? 2 : 1)
+      const drops =
+        action.drops ??
+        zieheDrops(
+          dungeon.id,
+          state.rank,
+          tuer.boss ? 2 : 1,
+          Math.random,
+          summiereEffekte(state.equipment),
+        )
       const beute = verteileBeute(state, drops)
 
       if (!tuer.boss) {
