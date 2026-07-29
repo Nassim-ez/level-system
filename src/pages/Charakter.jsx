@@ -28,11 +28,9 @@ function Kachel({ slot, itemId, gewaehlt, beschaedigt, blitzt, onSelect }) {
   const item = itemId ? ITEMS[itemId] : null
   const rar = raritaet(item)
   const belegt = !!item
-  const farbe = beschaedigt
-    ? 'var(--danger)'
-    : belegt
-      ? (rar?.color ?? 'var(--xp)')
-      : LEER_FARBE
+  // Rot bleibt Schaden vorbehalten: die Rarität färbt Rahmen und Symbol,
+  // Beschädigung zeigt allein das Kreuz-Abzeichen
+  const farbe = belegt ? (rar?.color ?? 'var(--xp)') : LEER_FARBE
 
   return (
     <button
@@ -89,6 +87,26 @@ function Kachel({ slot, itemId, gewaehlt, beschaedigt, blitzt, onSelect }) {
           +
         </span>
       )}
+      {belegt && beschaedigt && (
+        <span
+          className="absolute grid place-items-center"
+          title="beschädigt"
+          style={{
+            top: -5,
+            right: -5,
+            width: 15,
+            height: 15,
+            borderRadius: '50%',
+            background: '#1a0e12',
+            border: '1px solid var(--danger)',
+            color: 'var(--danger)',
+            fontSize: 8,
+            lineHeight: 1,
+          }}
+        >
+          ✕
+        </span>
+      )}
     </button>
   )
 }
@@ -129,8 +147,8 @@ function Charakterfeld({ name, rank }) {
       >
         <g
           fill="none"
-          stroke="rgba(63,182,255,.55)"
-          strokeWidth="1.6"
+          stroke="rgba(63,182,255,.4)"
+          strokeWidth="1.1"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
@@ -216,10 +234,7 @@ function ItemZeile({ item, slot, beschaedigt, angelegt, onAction }) {
   return (
     <div
       className="flex items-center gap-3 border p-2"
-      style={{
-        borderColor: beschaedigt ? 'var(--danger)' : 'var(--line)',
-        borderRadius: 12,
-      }}
+      style={{ borderColor: 'var(--line)', borderRadius: 12 }}
     >
       <div
         className="relative grid shrink-0 place-items-center"
@@ -269,6 +284,12 @@ function ItemZeile({ item, slot, beschaedigt, angelegt, onAction }) {
               </span>
             </span>
           ))}
+          {beschaedigt && (
+            <>
+              <span style={{ color: 'var(--dim)' }}> · </span>
+              <span style={{ color: 'var(--danger)' }}>beschädigt</span>
+            </>
+          )}
         </p>
         <span
           className="mt-0.5 inline-block px-1.5"
@@ -293,8 +314,9 @@ function ItemZeile({ item, slot, beschaedigt, angelegt, onAction }) {
           ...orbitron,
           fontSize: 9,
           letterSpacing: '1px',
-          color: angelegt ? 'var(--danger)' : 'var(--glow)',
-          border: `1px solid ${angelegt ? 'var(--danger)' : 'var(--glow)'}`,
+          color: angelegt ? 'var(--dim)' : 'var(--glow)',
+          border: `1px solid ${angelegt ? 'var(--dim)' : 'var(--glow)'}`,
+          background: 'transparent',
           borderRadius: 9,
         }}
       >
