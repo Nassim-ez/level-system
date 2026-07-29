@@ -305,6 +305,15 @@ export const SLOT_LABELS = {
   schuhe: 'SCHUHE',
 }
 
+// Schlüssel, bei denen ein niedrigerer Wert besser ist
+export const NIEDRIGER_IST_BESSER = ['load']
+
+// Ob ein Effekt für den Spieler vorteilhaft ist – nicht das Vorzeichen
+// allein entscheidet: weniger Belastung je Aktion ist ein Vorteil.
+export function istVorteil(key, wert) {
+  return NIEDRIGER_IST_BESSER.includes(key) ? wert < 0 : wert > 0
+}
+
 // Effekte als Liste, Vorteile zuerst
 export function effektListe(item) {
   if (!item?.effects) return []
@@ -312,10 +321,11 @@ export function effektListe(item) {
     .map(([key, wert]) => ({
       key,
       wert,
+      vorteil: istVorteil(key, wert),
       label: EFFECT_LABEL[key] ?? key,
       text: `${wert > 0 ? '+' : '−'}${Math.abs(wert)}% ${EFFECT_LABEL[key] ?? key}`,
     }))
-    .sort((a, b) => b.wert - a.wert)
+    .sort((a, b) => Number(b.vorteil) - Number(a.vorteil) || b.wert - a.wert)
 }
 
 export function effektText(item) {

@@ -6,6 +6,7 @@ import {
   SLOT_LABELS,
   EFFECT_LABEL,
   effektListe,
+  istVorteil,
   summiereEffekte,
   raritaet,
 } from '../data/items.js'
@@ -176,7 +177,7 @@ function Effekte({ item, size = '12px' }) {
       {liste.map((e, i) => (
         <span key={e.key}>
           {i > 0 && <span style={{ color: 'var(--dim)' }}> · </span>}
-          <span style={{ color: e.wert > 0 ? 'var(--xp)' : 'var(--danger)' }}>
+          <span style={{ color: e.vorteil ? 'var(--xp)' : 'var(--danger)' }}>
             {e.wert > 0 ? '+' : '−'}
             {Math.abs(e.wert)}% {e.label}
           </span>
@@ -441,8 +442,13 @@ function Charakter() {
 
   // Wirksame Gesamteffekte der getragenen Ausrüstung
   const gesamtEffekte = Object.entries(summiereEffekte(state.equipment))
-    .map(([key, wert]) => ({ key, wert, label: EFFECT_LABEL[key] ?? key }))
-    .sort((a, b) => b.wert - a.wert)
+    .map(([key, wert]) => ({
+      key,
+      wert,
+      vorteil: istVorteil(key, wert),
+      label: EFFECT_LABEL[key] ?? key,
+    }))
+    .sort((a, b) => Number(b.vorteil) - Number(a.vorteil) || b.wert - a.wert)
 
   const unequipped = state.inventory.map((id) => ITEMS[id]).filter(Boolean)
 
@@ -537,7 +543,7 @@ function Charakter() {
             gesamtEffekte.map((e, i) => (
               <span key={e.key}>
                 {i > 0 && <span style={{ color: 'var(--dim)' }}> · </span>}
-                <span style={{ color: e.wert > 0 ? 'var(--xp)' : 'var(--danger)' }}>
+                <span style={{ color: e.vorteil ? 'var(--xp)' : 'var(--danger)' }}>
                   {e.wert > 0 ? '+' : '−'}
                   {Math.abs(e.wert)}% {e.label}
                 </span>

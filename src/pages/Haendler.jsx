@@ -278,7 +278,7 @@ function Effekte({ item }) {
       {liste.map((e, i) => (
         <span key={e.key}>
           {i > 0 && <span style={{ color: 'var(--dim)' }}> · </span>}
-          <span style={{ color: e.wert > 0 ? 'var(--xp)' : 'var(--danger)' }}>
+          <span style={{ color: e.vorteil ? 'var(--xp)' : 'var(--danger)' }}>
             {e.wert > 0 ? '+' : '−'}
             {Math.abs(e.wert)}% {e.label}
           </span>
