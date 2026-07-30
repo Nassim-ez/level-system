@@ -10,7 +10,13 @@ import {
 import DungeonFight from './DungeonFight.jsx'
 import { MATERIALIEN } from '../data/items.js'
 import { todayKey } from '../data/quests.js'
-import { schwaecheText, serienFaktor, SCHLUESSEL_AB } from '../data/daily.js'
+import {
+  schwaecheText,
+  serienFaktor,
+  SCHLUESSEL_AB,
+  DAILY_LAUF_XP,
+  laufAktuell,
+} from '../data/daily.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -484,6 +490,8 @@ function TagesDungeon({ state, onStart }) {
                   <span style={{ color: mat?.color }}>{mat?.name}</span>
                   {' · '}
                   {t.hp} HP
+                  {' · '}
+                  <span style={{ color: 'var(--xp)' }}>{t.xp} XP</span>
                 </p>
               </div>
               <span
@@ -523,8 +531,9 @@ function TagesDungeon({ state, onStart }) {
             {progress > 0 ? 'LAUF FORTSETZEN' : 'LAUF STARTEN'}
           </button>
           <p className="mt-2" style={{ fontSize: '11px', color: 'var(--dim)' }}>
-            Belohnung: Material der jeweiligen Sorte, {SCHLUESSEL_AB} Tage in
-            Folge bringen einen Dungeon-Schlüssel. Keine Item-Beute.
+            Belohnung: Material der jeweiligen Sorte und {DAILY_LAUF_XP} XP für
+            den ganzen Lauf, {SCHLUESSEL_AB} Tage in Folge bringen einen
+            Dungeon-Schlüssel. Keine Item-Beute.
           </p>
         </>
       )}
@@ -545,10 +554,10 @@ function Dungeon() {
   // Lauf für heute sicherstellen, falls der Tageswechsel noch nicht lief
   useEffect(() => {
     const heute = todayKey()
-    if (state.daily?.date !== heute || (state.daily?.doors?.length ?? 0) !== 3) {
+    if (!laufAktuell(state.daily, heute)) {
       dispatch({ type: 'DAILY_ENSURE', today: heute })
     }
-  }, [state.daily?.date, state.daily?.doors?.length, dispatch])
+  }, [state.daily, dispatch])
 
   // Einmalige Einblendung, sobald sich das Tor schließt
   const [warInside, setWarInside] = useState(state.dungeon.inside)

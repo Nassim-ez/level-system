@@ -34,9 +34,10 @@ import { findDungeon, doorHp } from '../data/dungeons.js'
 import {
   ziehTag,
   serienFaktor,
+  stufenXp,
+  laufAktuell,
   MAT_PRO_TUER,
   MAT_PRO_BOSS,
-  DAILY_TUER_XP,
   SCHLUESSEL_AB,
 } from '../data/daily.js'
 
@@ -576,19 +577,21 @@ function reducer(state, action) {
       return { ...state, daily: { ...state.daily, fight: action.fight } }
     }
     case 'DAILY_ENSURE': {
-      // Lauf für heute anlegen, falls noch keiner existiert
-      if (state.daily?.date === action.today && state.daily.doors?.length === 3) {
-        return state
-      }
+      // Lauf für heute anlegen, falls noch keiner existiert.
+      // Ältere Spielstände haben Stufen ohne XP-Wert – für die wird neu
+      // gezogen. Die Ziehung hängt am Datum, es kommen also dieselben
+      // Gegner heraus, nur mit den XP je Stufe.
+      if (laufAktuell(state.daily, action.today)) return state
+      const gleicherTag = state.daily?.date === action.today
       return {
         ...state,
         daily: {
           date: action.today,
           doors: ziehTag(action.today, state.rank),
-          progress: 0,
-          done: false,
+          progress: gleicherTag ? (state.daily.progress ?? 0) : 0,
+          done: gleicherTag ? !!state.daily.done : false,
           streak: state.daily?.streak ?? 0,
-          fight: null,
+          fight: gleicherTag ? (state.daily.fight ?? null) : null,
         },
       }
     }
@@ -615,7 +618,7 @@ function reducer(state, action) {
         boss ? `${tuer.gegnerart} bezwungen` : `Stufe ${tuer.nr} geschafft`,
         {
           detail: `+${menge} ${materialName(tuer.material)}${faktor > 1 ? ` · Serie ×${faktor}` : ''}`,
-          xp: DAILY_TUER_XP,
+          xp: stufenXp(tuer),
         },
       )
       // Der siebte Tag in Folge bringt zusätzlich einen Schlüssel
@@ -639,7 +642,7 @@ function reducer(state, action) {
         },
         log,
       }
-      next = reducer(next, { type: 'ADD_XP', amount: DAILY_TUER_XP })
+      next = reducer(next, { type: 'ADD_XP', amount: stufenXp(tuer) })
       return next
     }
     case 'DAILY_DEFEAT': {

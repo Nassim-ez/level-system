@@ -26,16 +26,38 @@ export const TAGESBOSSE = [
   { id: 'mahlzahn', name: 'Mahlzahn', sprite: 'koloss', material: 'basalt', schwaechen: { tempo: 2 }, angriffsname: 'Mahlbiss' },
 ]
 
-// Grundwerte der drei Stufen, vor dem Rangfaktor
+// Grundwerte der drei Stufen, vor dem Rangfaktor.
+// Die XP sind bewusst knapp, damit der Haupt-Dungeon pro Durchgang
+// ertragreicher bleibt: 15 + 15 + 25 = 55 XP für den ganzen Lauf.
 export const STUFEN = [
-  { nr: 1, anzahl: 2, hp: 12, schaden: 5 },
-  { nr: 2, anzahl: 2, hp: 18, schaden: 6 },
-  { nr: 3, anzahl: 1, hp: 60, schaden: 10, boss: true },
+  { nr: 1, anzahl: 2, hp: 12, schaden: 5, xp: 15 },
+  { nr: 2, anzahl: 2, hp: 18, schaden: 6, xp: 15 },
+  { nr: 3, anzahl: 1, hp: 60, schaden: 10, xp: 25, boss: true },
 ]
+
+// XP des kompletten Laufs
+export const DAILY_LAUF_XP = STUFEN.reduce((s, t) => s + t.xp, 0)
+
+// XP einer Stufe, auch wenn die Tür aus einem älteren Spielstand stammt
+export function stufenXp(tuer) {
+  if (typeof tuer?.xp === 'number') return tuer.xp
+  return STUFEN.find((st) => st.nr === tuer?.nr)?.xp ?? 0
+}
+
+/**
+ * Ist der gespeicherte Lauf für heute brauchbar? Ältere Spielstände haben
+ * Stufen ohne XP-Wert und müssen neu gezogen werden.
+ */
+export function laufAktuell(daily, heute) {
+  return (
+    daily?.date === heute &&
+    daily.doors?.length === 3 &&
+    daily.doors.every((t) => typeof t.xp === 'number')
+  )
+}
 
 export const DAILY_INTERVALL = 4
 export const DAILY_BLOCKCHANCE = 0.8
-export const DAILY_TUER_XP = 40
 
 // Belohnung: Material je Tür bzw. Boss
 export const MAT_PRO_TUER = 1
@@ -107,6 +129,7 @@ export function ziehTag(datum, rank) {
       resistenzen: {},
       combo: !!g.combo,
       boss: !!stufe.boss,
+      xp: stufe.xp,
       angriffsname: g.angriffsname,
     }
   })
