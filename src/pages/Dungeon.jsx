@@ -8,6 +8,9 @@ import {
   findDungeon,
 } from '../data/dungeons.js'
 import DungeonFight from './DungeonFight.jsx'
+import { MATERIALIEN } from '../data/items.js'
+import { todayKey } from '../data/quests.js'
+import { schwaecheText, serienFaktor, SCHLUESSEL_AB } from '../data/daily.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -403,6 +406,132 @@ function Tuerkarte({ state, dispatch, dungeon, onFight }) {
   )
 }
 
+/* --------------------------------------------------------------------- */
+/* Tages-Dungeon: kurzer Drei-Stufen-Lauf, ein Versuch pro Tag             */
+/* --------------------------------------------------------------------- */
+function TagesDungeon({ state, onStart }) {
+  const daily = state.daily ?? {}
+  const doors = daily.doors ?? []
+  const progress = daily.progress ?? 0
+  const streak = daily.streak ?? 0
+  const faktor = serienFaktor(streak)
+
+  return (
+    <Panel title="TAGES-DUNGEON">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p style={{ fontSize: '12px', color: 'var(--dim)' }}>
+          Drei Stufen, ein Versuch pro Tag.
+        </p>
+        <span
+          className="shrink-0 px-2 py-0.5"
+          style={{
+            ...orbitron,
+            fontSize: 9,
+            letterSpacing: '1px',
+            color: streak > 0 ? 'var(--xp)' : 'var(--dim)',
+            border: `1px solid ${streak > 0 ? 'var(--xp)' : 'var(--line)'}`,
+            borderRadius: 7,
+          }}
+        >
+          SERIE {streak}
+          {faktor > 1 ? ` · ×${faktor}` : ''}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {doors.map((t, i) => {
+          const fertig = i < progress
+          const offen = i === progress && !daily.done
+          const mat = MATERIALIEN[t.material]
+          return (
+            <div
+              key={i}
+              className="flex items-center gap-3 border p-2"
+              style={{
+                borderColor: fertig
+                  ? 'rgba(143,224,255,.45)'
+                  : offen
+                    ? 'var(--glow)'
+                    : 'var(--line)',
+                borderRadius: 12,
+                opacity: fertig || offen ? 1 : 0.5,
+              }}
+            >
+              <span
+                className="grid shrink-0 place-items-center"
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 8,
+                  border: `1px solid ${offen ? 'var(--glow)' : 'var(--line)'}`,
+                  ...orbitron,
+                  fontSize: 11,
+                  color: fertig ? 'var(--xp)' : offen ? 'var(--glow)' : 'var(--dim)',
+                }}
+              >
+                {t.boss ? '★' : t.nr}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[14px] font-semibold">
+                  {t.gegnerart}
+                  {t.anzahl > 1 && (
+                    <span style={{ color: 'var(--dim)' }}> ×{t.anzahl}</span>
+                  )}
+                </p>
+                <p style={{ fontSize: '11px', color: 'var(--dim)' }}>
+                  Schwach: <span style={{ color: 'var(--xp)' }}>{schwaecheText(t)}</span>
+                  {' · '}
+                  <span style={{ color: mat?.color }}>{mat?.name}</span>
+                  {' · '}
+                  {t.hp} HP
+                </p>
+              </div>
+              <span
+                style={{
+                  ...orbitron,
+                  fontSize: 8,
+                  letterSpacing: '1px',
+                  color: fertig ? 'var(--xp)' : offen ? 'var(--glow)' : 'var(--dim)',
+                }}
+              >
+                {fertig ? 'GESCHAFFT' : offen ? 'OFFEN' : 'WARTET'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {daily.done ? (
+        <p className="mt-3" style={{ fontSize: '13px', color: 'var(--dim)' }}>
+          Heute erledigt – morgen wartet ein neuer Lauf.
+        </p>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={onStart}
+            className="mt-3 w-full bg-transparent px-4 py-2.5"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--glow)',
+              border: '1px solid var(--glow)',
+              borderRadius: 10,
+            }}
+          >
+            {progress > 0 ? 'LAUF FORTSETZEN' : 'LAUF STARTEN'}
+          </button>
+          <p className="mt-2" style={{ fontSize: '11px', color: 'var(--dim)' }}>
+            Belohnung: Material der jeweiligen Sorte, {SCHLUESSEL_AB} Tage in
+            Folge bringen einen Dungeon-Schlüssel. Keine Item-Beute.
+          </p>
+        </>
+      )}
+    </Panel>
+  )
+}
+
 function Dungeon() {
   const { state, dispatch } = useGame()
   const [gate, setGate] = useState(false)
@@ -410,7 +539,16 @@ function Dungeon() {
   const [imKampf, setImKampf] = useState(
     () => !!state.dungeon.fight && state.dungeon.door > 0,
   )
+  const [imTageslauf, setImTageslauf] = useState(() => !!state.daily?.fight)
   const dungeon = findDungeon(state.dungeon.run)
+
+  // Lauf für heute sicherstellen, falls der Tageswechsel noch nicht lief
+  useEffect(() => {
+    const heute = todayKey()
+    if (state.daily?.date !== heute || (state.daily?.doors?.length ?? 0) !== 3) {
+      dispatch({ type: 'DAILY_ENSURE', today: heute })
+    }
+  }, [state.daily?.date, state.daily?.doors?.length, dispatch])
 
   // Einmalige Einblendung, sobald sich das Tor schließt
   const [warInside, setWarInside] = useState(state.dungeon.inside)
@@ -429,16 +567,24 @@ function Dungeon() {
     <>
       {gate && <GateOverlay onDone={() => setGate(false)} />}
       {kampfAktiv && <DungeonFight onExit={() => setImKampf(false)} />}
-      {dungeon ? (
-        <Tuerkarte
-          state={state}
-          dispatch={dispatch}
-          dungeon={dungeon}
-          onFight={() => setImKampf(true)}
-        />
-      ) : (
-        <Auswahl state={state} dispatch={dispatch} />
+      {imTageslauf && !kampfAktiv && (state.daily?.doors?.length ?? 0) === 3 && (
+        <DungeonFight daily onExit={() => setImTageslauf(false)} />
       )}
+      <div className="flex flex-col gap-4">
+        {!state.dungeon.inside && (
+          <TagesDungeon state={state} onStart={() => setImTageslauf(true)} />
+        )}
+        {dungeon ? (
+          <Tuerkarte
+            state={state}
+            dispatch={dispatch}
+            dungeon={dungeon}
+            onFight={() => setImKampf(true)}
+          />
+        ) : (
+          <Auswahl state={state} dispatch={dispatch} />
+        )}
+      </div>
     </>
   )
 }

@@ -187,6 +187,20 @@ function baueItems() {
       }
     }
   }
+  items.dungeonschluessel = {
+    id: 'dungeonschluessel',
+    basisId: 'dungeonschluessel',
+    stufen: 0,
+    name: 'Dungeon-Schlüssel',
+    basisName: 'Dungeon-Schlüssel',
+    slot: null,
+    material: 'basalt',
+    rar: null,
+    verbrauchbar: true,
+    beschreibung:
+      'Belohnung für sieben Tage Tages-Dungeon in Folge. Öffnet verschlossene Wege.',
+    effects: {},
+  }
   items.serienschutz = {
     id: 'serienschutz',
     basisId: 'serienschutz',

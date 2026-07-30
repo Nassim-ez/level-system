@@ -31,6 +31,14 @@ import {
   nextRank,
 } from '../data/ranks.js'
 import { findDungeon, doorHp } from '../data/dungeons.js'
+import {
+  ziehTag,
+  serienFaktor,
+  MAT_PRO_TUER,
+  MAT_PRO_BOSS,
+  DAILY_TUER_XP,
+  SCHLUESSEL_AB,
+} from '../data/daily.js'
 
 const STORAGE_KEY = 'system_save'
 
@@ -75,6 +83,7 @@ const initialState = {
     fight: null, // laufender Kampf, wird nach jedem Zug gespeichert
   },
   materials: { basalt: 0, knochen: 0, schatten: 0, wolf: 0 },
+  daily: { date: null, doors: [], progress: 0, done: false, streak: 0, fight: null },
   damagedItems: {}, // im Dungeon beschädigte Items (itemId → true)
   klasse: null,
   gender: null,
@@ -244,6 +253,22 @@ function reducer(state, action) {
           log = withLog(log, 'Serie verloren', { detail: '−50 XP' })
         }
       }
+      // Tages-Dungeon: neuen Lauf ziehen; ein ungeklärter Vortag beendet die Serie
+      const vortagGeklaert = state.daily?.progress >= 3
+      const daily = {
+        date: action.today,
+        doors: ziehTag(action.today, state.rank),
+        progress: 0,
+        done: false,
+        streak: state.daily?.date ? (vortagGeklaert ? state.daily.streak : 0) : 0,
+        fight: null,
+      }
+      if (state.daily?.date && !vortagGeklaert && (state.daily.streak ?? 0) > 0) {
+        log = withLog(log, 'Tages-Serie verloren', {
+          detail: 'Der Lauf von gestern blieb offen',
+        })
+      }
+
       // Erledigte Wochen-Aufgaben aus dem Pool entfernen, dann neu ziehen
       const poolTasks = state.poolTasks.filter((t) => !t.done)
       const drawnTask =
@@ -263,6 +288,7 @@ function reducer(state, action) {
         log,
         poolTasks,
         drawnTask,
+        daily,
       }
     }
     case 'COMPLETE_QUEST': {
@@ -544,6 +570,91 @@ function reducer(state, action) {
           detail: `+${ertrag} ${materialName(item.material)}`,
         }),
       }
+    }
+    case 'DAILY_SYNC': {
+      // Kampfzustand des Tageslaufs nach jedem Zug sichern
+      return { ...state, daily: { ...state.daily, fight: action.fight } }
+    }
+    case 'DAILY_ENSURE': {
+      // Lauf für heute anlegen, falls noch keiner existiert
+      if (state.daily?.date === action.today && state.daily.doors?.length === 3) {
+        return state
+      }
+      return {
+        ...state,
+        daily: {
+          date: action.today,
+          doors: ziehTag(action.today, state.rank),
+          progress: 0,
+          done: false,
+          streak: state.daily?.streak ?? 0,
+          fight: null,
+        },
+      }
+    }
+    case 'DAILY_CLEAR_DOOR': {
+      const daily = state.daily
+      const tuer = daily?.doors?.[daily.progress]
+      if (!tuer || daily.done) return state
+
+      const boss = !!tuer.boss
+      const progress = daily.progress + 1
+      const streak = boss ? (daily.streak ?? 0) + 1 : (daily.streak ?? 0)
+
+      // Material nach Gegnersorte, mit Serien-Faktor
+      const faktor = serienFaktor(streak)
+      const menge = Math.round((boss ? MAT_PRO_BOSS : MAT_PRO_TUER) * faktor)
+      const materials = {
+        ...state.materials,
+        [tuer.material]: (state.materials?.[tuer.material] ?? 0) + menge,
+      }
+
+      let inventory = state.inventory
+      let log = withLog(
+        state.log,
+        boss ? `${tuer.gegnerart} bezwungen` : `Stufe ${tuer.nr} geschafft`,
+        {
+          detail: `+${menge} ${materialName(tuer.material)}${faktor > 1 ? ` · Serie ×${faktor}` : ''}`,
+          xp: DAILY_TUER_XP,
+        },
+      )
+      // Der siebte Tag in Folge bringt zusätzlich einen Schlüssel
+      if (boss && streak === SCHLUESSEL_AB) {
+        inventory = [...inventory, 'dungeonschluessel']
+        log = withLog(log, 'Dungeon-Schlüssel erhalten', {
+          detail: 'Sieben Tage Tages-Dungeon in Folge',
+        })
+      }
+
+      let next = {
+        ...state,
+        materials,
+        inventory,
+        daily: {
+          ...daily,
+          progress,
+          streak,
+          done: boss,
+          fight: null,
+        },
+        log,
+      }
+      next = reducer(next, { type: 'ADD_XP', amount: DAILY_TUER_XP })
+      return next
+    }
+    case 'DAILY_DEFEAT': {
+      // Niederlage: XP bleiben, keine Materialien, keine Aura- oder Item-Folgen
+      return {
+        ...state,
+        daily: { ...state.daily, done: true, streak: 0, fight: null },
+        log: withLog(state.log, 'Tages-Dungeon gescheitert', {
+          detail: 'Serie endet · morgen wartet ein neuer Lauf',
+        }),
+      }
+    }
+    case 'DAILY_LEAVE': {
+      // Verlassen ist jederzeit erlaubt und beendet den Versuch nicht
+      return { ...state, daily: { ...state.daily, fight: null } }
     }
     case 'DUNGEON_FIGHT_SYNC': {
       // Kampfzustand nach jedem Zug sichern

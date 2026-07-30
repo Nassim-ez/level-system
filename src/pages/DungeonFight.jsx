@@ -4,6 +4,11 @@ import FightSprite from '../components/FightSprites.jsx'
 import { findDungeon } from '../data/dungeons.js'
 import { ITEMS, MATERIALIEN, raritaet, summiereEffekte } from '../data/items.js'
 import { zieheDrops } from '../data/loot.js'
+import {
+  serienFaktor,
+  MAT_PRO_TUER,
+  MAT_PRO_BOSS,
+} from '../data/daily.js'
 import { auraDamageBonus, auraStage } from '../data/aura.js'
 import {
   ANGRIFFE,
@@ -85,15 +90,21 @@ function Leiste({ wert, max, farbe, glow, hoehe = 9, mine }) {
   )
 }
 
-function DungeonFight({ onExit }) {
+function DungeonFight({ onExit, daily = false }) {
   const { state, dispatch } = useGame()
-  const dungeon = findDungeon(state.dungeon.run)
-  const tuer = dungeon?.tueren.find((t) => t.nr === state.dungeon.door)
+  // Der Tageslauf nutzt dieselbe Ansicht, aber ohne Tor-Mechanik
+  const dungeon = daily
+    ? { id: 'daily', name: 'Tages-Dungeon', rank: state.rank, tueren: state.daily.doors }
+    : findDungeon(state.dungeon.run)
+  const tuer = daily
+    ? state.daily.doors?.[state.daily.progress]
+    : dungeon?.tueren.find((t) => t.nr === state.dungeon.door)
+  const gespeichert = daily ? state.daily.fight : state.dungeon.fight
 
   const effekte = summiereEffekte(state.equipment)
   const maxVit = maxVitalitaet(effekte)
   const [k, setK] = useState(
-    () => state.dungeon.fight ?? (tuer ? neuerKampf(tuer, maxVit) : null),
+    () => gespeichert ?? (tuer ? neuerKampf(tuer, maxVit) : null),
   )
   const [pAnim, setPAnim] = useState('')
   const [eAnim, setEAnim] = useState('')
@@ -106,8 +117,8 @@ function DungeonFight({ onExit }) {
   const merkFlag = useRef(false)
 
   useEffect(() => {
-    if (k) dispatch({ type: 'DUNGEON_FIGHT_SYNC', fight: k })
-  }, [k, dispatch])
+    if (k) dispatch({ type: daily ? 'DAILY_SYNC' : 'DUNGEON_FIGHT_SYNC', fight: k })
+  }, [k, dispatch, daily])
 
   // Nach dem Rasten: Werte auffrischen
   useEffect(() => {
@@ -137,12 +148,12 @@ function DungeonFight({ onExit }) {
     }
   }, [])
 
-  // Torschluss-Einblendung beim ersten Betreten
+  // Torschluss-Einblendung nur im Hauptlauf
   useEffect(() => {
-    if (!merkFlag.current && state.dungeon.inside && (k?.zug ?? 0) === 0) {
+    if (!daily && !merkFlag.current && state.dungeon.inside && (k?.zug ?? 0) === 0) {
       merkFlag.current = true
     }
-  }, [state.dungeon.inside, k?.zug])
+  }, [daily, state.dungeon.inside, k?.zug])
 
   if (!dungeon || !tuer || !k) return null
 
@@ -286,7 +297,19 @@ function DungeonFight({ onExit }) {
         // Kammer geräumt
         anim('e', 'die', 1100)
         neu.beendet = 'sieg'
-        const drops = zieheDrops(dungeon.id, state.rank, tuer.boss ? 2 : 1, Math.random, effekte)
+        // Der Tageslauf gibt Material, der Hauptlauf gezogene Beute
+        const drops = daily
+          ? [
+              {
+                art: 'material',
+                material: tuer.material,
+                menge: Math.round(
+                  (tuer.boss ? MAT_PRO_BOSS : MAT_PRO_TUER) *
+                    serienFaktor((state.daily.streak ?? 0) + (tuer.boss ? 1 : 0)),
+                ),
+              },
+            ]
+          : zieheDrops(dungeon.id, state.rank, tuer.boss ? 2 : 1, Math.random, effekte)
         timers.current.push(setTimeout(() => setPopup({ art: 'sieg', drops }), 900))
         return neu
       }
@@ -345,17 +368,22 @@ function DungeonFight({ onExit }) {
 
   // --- Abschluss ---------------------------------------------------------
   function siegBestaetigen() {
-    dispatch({ type: 'DUNGEON_CLEAR_DOOR', drops: popup.drops })
+    dispatch(
+      daily
+        ? { type: 'DAILY_CLEAR_DOOR' }
+        : { type: 'DUNGEON_CLEAR_DOOR', drops: popup.drops },
+    )
     setPopup(null)
     onExit()
   }
   function niederlageBestaetigen() {
-    dispatch({ type: 'DUNGEON_DEFEAT' })
+    dispatch({ type: daily ? 'DAILY_DEFEAT' : 'DUNGEON_DEFEAT' })
     setPopup(null)
     onExit()
   }
-  function rasten() {
-    dispatch({ type: 'DUNGEON_REST' })
+  // Im Tageslauf jederzeit verlassen, im Hauptlauf rasten
+  function verlassen() {
+    dispatch({ type: daily ? 'DAILY_LEAVE' : 'DUNGEON_REST' })
     onExit()
   }
 
@@ -376,7 +404,7 @@ function DungeonFight({ onExit }) {
       <div className="flex shrink-0 items-center gap-2 px-0.5 pb-2">
         <button
           type="button"
-          onClick={rasten}
+          onClick={verlassen}
           className="bg-transparent px-2.5 py-1.5"
           style={{
             ...orbitron,
@@ -387,13 +415,13 @@ function DungeonFight({ onExit }) {
             borderRadius: '9px',
           }}
         >
-          RASTEN
+          {daily ? 'VERLASSEN' : 'RASTEN'}
         </button>
         <p
           className="flex-1 text-center"
           style={{ ...orbitron, fontSize: '10px', letterSpacing: '2px', color: 'var(--glow)' }}
         >
-          TÜR {tuer.nr} / {dungeon.tueren.length}
+          {daily ? 'STUFE' : 'TÜR'} {tuer.nr} / {dungeon.tueren.length}
         </p>
         <button
           type="button"
@@ -845,14 +873,16 @@ function DungeonFight({ onExit }) {
               {popup.art === 'sieg'
                 ? tuer.boss
                   ? 'BOSS BEZWUNGEN'
-                  : 'TÜR GEÖFFNET'
+                  : daily
+                    ? 'STUFE GESCHAFFT'
+                    : 'TÜR GEÖFFNET'
                 : 'RÜCKZUG'}
             </h2>
             <p style={{ color: 'var(--dim)', fontSize: '13.5px', lineHeight: 1.6 }}>
               {popup.art === 'sieg'
                 ? tuer.boss
                   ? `${dungeon.name} ist abgeschlossen.`
-                  : `Tür ${tuer.nr} ist frei. Der Weg führt weiter.`
+                  : `${daily ? 'Stufe' : 'Tür'} ${tuer.nr} ist frei. Der Weg führt weiter.`
                 : 'Deine Vitalität ist erschöpft. Das System zieht dich aus dem Dungeon.'}
             </p>
 
@@ -896,11 +926,23 @@ function DungeonFight({ onExit }) {
             )}
             {popup.art === 'niederlage' && (
               <div style={{ ...orbitron, color: 'var(--danger)', fontSize: '12px', marginTop: 10, lineHeight: 1.9 }}>
-                Aura erlischt
-                <br />
-                Ein getragenes Item wird beschädigt
-                <br />
-                Durchgang beginnt wieder bei Tür 1
+                {daily ? (
+                  <>
+                    XP bleiben dir
+                    <br />
+                    Keine Materialien · Tages-Serie endet
+                    <br />
+                    Morgen wartet ein neuer Lauf
+                  </>
+                ) : (
+                  <>
+                    Aura erlischt
+                    <br />
+                    Ein getragenes Item wird beschädigt
+                    <br />
+                    Durchgang beginnt wieder bei Tür 1
+                  </>
+                )}
               </div>
             )}
 
