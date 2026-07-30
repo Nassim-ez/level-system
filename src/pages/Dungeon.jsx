@@ -8,7 +8,8 @@ import {
   findDungeon,
 } from '../data/dungeons.js'
 import DungeonFight from './DungeonFight.jsx'
-import { MATERIALIEN } from '../data/items.js'
+import { ITEMS, MATERIALIEN, raritaet } from '../data/items.js'
+import SlotIcon from '../components/SlotIcons.jsx'
 import { todayKey } from '../data/quests.js'
 import {
   schwaecheText,
@@ -202,6 +203,61 @@ function Auswahl({ state, dispatch }) {
   )
 }
 
+/* --------------------------------------------------------------------- */
+/* Verlorene Ausrüstung – Fundorte der beim Tod zurückgelassenen Teile     */
+/* --------------------------------------------------------------------- */
+function fundortText(eintrag) {
+  const dungeon = findDungeon(eintrag.dungeonId)
+  return `${eintrag.enemyName} · Tür ${eintrag.doorIndex} · ${dungeon?.name ?? 'Unbekannter Dungeon'}`
+}
+
+function VerloreneAusruestung({ lostItems }) {
+  return (
+    <Panel title="VERLORENE AUSRÜSTUNG">
+      <div className="flex flex-col gap-2">
+        {lostItems.map((eintrag, i) => {
+          const item = ITEMS[eintrag.itemId]
+          const rar = raritaet(item)
+          const farbe = rar?.color ?? 'var(--xp)'
+          return (
+            <div
+              key={`${eintrag.itemId}-${i}`}
+              className="flex items-center gap-3 border p-2"
+              style={{ borderColor: 'var(--line)', borderRadius: 12 }}
+            >
+              <span
+                className="grid shrink-0 place-items-center"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 11,
+                  border: `1px solid rgba(${rar?.rgb ?? '143,224,255'},.5)`,
+                  background: `rgba(${rar?.rgb ?? '143,224,255'},.08)`,
+                  color: farbe,
+                }}
+              >
+                <SlotIcon slot={item?.slot} size="60%" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[14px] font-semibold" style={{ color: farbe }}>
+                  {item?.name ?? eintrag.itemId}
+                </p>
+                <p className="truncate" style={{ fontSize: '11px', color: 'var(--dim)' }}>
+                  {fundortText(eintrag)}
+                </p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-3" style={{ fontSize: '11.5px', color: 'var(--dim)' }}>
+        Besiege den Gegner erneut, um es zurückzuholen – es kehrt beschädigt
+        zurück.
+      </p>
+    </Panel>
+  )
+}
+
 function Tuerkarte({ state, dispatch, dungeon, onFight }) {
   const { progress, inside, door } = state.dungeon
   const geschafft = dungeon.tueren.filter((t) => progress[t.nr]).length
@@ -263,6 +319,10 @@ function Tuerkarte({ state, dispatch, dungeon, onFight }) {
             const fertig = !!progress[tuer.nr]
             const offen = naechste?.nr === tuer.nr
             const aktiv = inside && door === tuer.nr
+            // Hier liegt noch zurückgelassene Ausrüstung
+            const verloren = (state.lostItems ?? []).some(
+              (e) => e.dungeonId === dungeon.id && e.doorIndex === tuer.nr,
+            )
             const farbe = fertig
               ? 'var(--ok)'
               : offen
@@ -304,6 +364,14 @@ function Tuerkarte({ state, dispatch, dungeon, onFight }) {
                           ? `${tuer.anzahl > 1 ? `${tuer.anzahl} Gegner · je ` : ''}${tuer.hp} HP`
                           : 'Unbekannt'}
                       </p>
+                      {verloren && (
+                        <p
+                          className="truncate"
+                          style={{ fontSize: '10.5px', color: 'var(--xp)' }}
+                        >
+                          ◆ Deine Ausrüstung liegt hier
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
@@ -582,6 +650,9 @@ function Dungeon() {
       <div className="flex flex-col gap-4">
         {!state.dungeon.inside && (
           <TagesDungeon state={state} onStart={() => setImTageslauf(true)} />
+        )}
+        {(state.lostItems?.length ?? 0) > 0 && (
+          <VerloreneAusruestung lostItems={state.lostItems} />
         )}
         {dungeon ? (
           <Tuerkarte

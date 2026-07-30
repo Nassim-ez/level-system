@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../context/GameContext.jsx'
 import FightSprite from '../components/FightSprites.jsx'
 import { findDungeon } from '../data/dungeons.js'
-import { ITEMS, MATERIALIEN, raritaet, summiereEffekte } from '../data/items.js'
+import {
+  ITEMS,
+  MATERIALIEN,
+  herabgestuft,
+  raritaet,
+  summiereEffekte,
+} from '../data/items.js'
 import { zieheDrops } from '../data/loot.js'
 import {
   serienFaktor,
@@ -228,7 +234,12 @@ function DungeonFight({ onExit, daily = false }) {
     }
     if (neu.vitalitaet <= 0) {
       neu.beendet = 'niederlage'
-      timers.current.push(setTimeout(() => setPopup({ art: 'niederlage' }), 700))
+      // Im Hauptlauf bleibt ein getragenes Teil beim Gegner zurück. Die Wahl
+      // fällt hier, damit das Popup es beim Namen nennen kann.
+      const verlust = daily ? null : waehleVerlust()
+      timers.current.push(
+        setTimeout(() => setPopup({ art: 'niederlage', verlust }), 700),
+      )
     }
     return neu
   }
@@ -367,20 +378,64 @@ function DungeonFight({ onExit, daily = false }) {
   }
 
   // --- Abschluss ---------------------------------------------------------
+  // Welches getragene Teil bleibt bei einer Niederlage zurück?
+  function waehleVerlust() {
+    const getragene = Object.entries(state.equipment).filter(([, id]) => id)
+    if (getragene.length === 0) return null
+    const [slot, itemId] =
+      getragene[Math.floor(Math.random() * getragene.length)]
+    return { slot, itemId }
+  }
+
+  // Liegt an dieser Tür verlorene Ausrüstung?
+  const verloreneHier =
+    !daily && tuer
+      ? (state.lostItems ?? []).find(
+          (e) => e.dungeonId === dungeon?.id && e.doorIndex === tuer.nr,
+        )
+      : null
+
   function siegBestaetigen() {
-    dispatch(
-      daily
-        ? { type: 'DAILY_CLEAR_DOOR' }
-        : { type: 'DUNGEON_CLEAR_DOOR', drops: popup.drops },
-    )
+    if (daily) {
+      dispatch({ type: 'DAILY_CLEAR_DOOR' })
+      setPopup(null)
+      onExit()
+      return
+    }
+    // Erst die Rückholung zeigen, dann erst den Sieg buchen – sonst wäre der
+    // Eintrag schon fort, wenn das Popup ihn benennen soll.
+    if (verloreneHier) {
+      setPopup({ art: 'zurueck', drops: popup.drops, eintrag: verloreneHier })
+      return
+    }
+    dispatch({ type: 'DUNGEON_CLEAR_DOOR', drops: popup.drops })
+    setPopup(null)
+    onExit()
+  }
+  function rueckholungBestaetigen() {
+    dispatch({ type: 'DUNGEON_CLEAR_DOOR', drops: popup.drops })
     setPopup(null)
     onExit()
   }
   function niederlageBestaetigen() {
-    dispatch({ type: daily ? 'DAILY_DEFEAT' : 'DUNGEON_DEFEAT' })
+    dispatch(
+      daily
+        ? { type: 'DAILY_DEFEAT' }
+        : { type: 'DUNGEON_DEFEAT', slot: popup.verlust?.slot },
+    )
     setPopup(null)
     onExit()
   }
+
+  // Sieg und Rückholung tragen die helle Akzentfarbe, die Niederlage Rot
+  const popupFarbe =
+    popup?.art === 'sieg'
+      ? 'var(--glow)'
+      : popup?.art === 'zurueck'
+        ? 'var(--xp)'
+        : 'var(--danger)'
+  const popupSchein =
+    popup?.art === 'niederlage' ? 'rgba(255,77,94,.3)' : 'rgba(63,182,255,.3)'
   // Im Tageslauf jederzeit verlassen, im Hauptlauf rasten
   function verlassen() {
     dispatch({ type: daily ? 'DAILY_LEAVE' : 'DUNGEON_REST' })
@@ -854,19 +909,25 @@ function DungeonFight({ onExit, daily = false }) {
             className="w-full max-w-[340px] rounded-2xl p-[22px] text-center"
             style={{
               background: 'var(--panel)',
-              border: `1px solid ${popup.art === 'sieg' ? 'var(--glow)' : 'var(--danger)'}`,
-              boxShadow: `0 0 40px ${popup.art === 'sieg' ? 'rgba(63,182,255,.3)' : 'rgba(255,77,94,.3)'}`,
+              border: `1px solid ${popupFarbe}`,
+              boxShadow: `0 0 40px ${popupSchein}`,
             }}
           >
             <div style={{ fontSize: 36 }}>
-              {popup.art === 'sieg' ? (tuer.boss ? '👑' : '⚔️') : '🛡️'}
+              {popup.art === 'sieg'
+                ? tuer.boss
+                  ? '👑'
+                  : '⚔️'
+                : popup.art === 'zurueck'
+                  ? '🎒'
+                  : '🛡️'}
             </div>
             <h2
               style={{
                 ...orbitron,
                 fontSize: '15px',
                 letterSpacing: '3px',
-                color: popup.art === 'sieg' ? 'var(--glow)' : 'var(--danger)',
+                color: popupFarbe,
                 margin: '6px 0 10px',
               }}
             >
@@ -876,15 +937,50 @@ function DungeonFight({ onExit, daily = false }) {
                   : daily
                     ? 'STUFE GESCHAFFT'
                     : 'TÜR GEÖFFNET'
-                : 'RÜCKZUG'}
+                : popup.art === 'zurueck'
+                  ? 'ZURÜCKGEHOLT'
+                  : 'RÜCKZUG'}
             </h2>
             <p style={{ color: 'var(--dim)', fontSize: '13.5px', lineHeight: 1.6 }}>
               {popup.art === 'sieg'
                 ? tuer.boss
                   ? `${dungeon.name} ist abgeschlossen.`
                   : `${daily ? 'Stufe' : 'Tür'} ${tuer.nr} ist frei. Der Weg führt weiter.`
-                : 'Deine Vitalität ist erschöpft. Das System zieht dich aus dem Dungeon.'}
+                : popup.art === 'zurueck'
+                  ? `${ITEMS[popup.eintrag.itemId]?.name} lag beim ${popup.eintrag.enemyName}. Du nimmst es wieder an dich – gezeichnet vom Liegenbleiben.`
+                  : 'Deine Vitalität ist erschöpft. Das System zieht dich aus dem Dungeon.'}
             </p>
+
+            {popup.art === 'zurueck' &&
+              (() => {
+                const alt = ITEMS[popup.eintrag.itemId]
+                const neu = ITEMS[herabgestuft(popup.eintrag.itemId) ?? popup.eintrag.itemId]
+                const altR = raritaet(alt)
+                const neuR = raritaet(neu)
+                return (
+                  <div
+                    className="mt-3 flex items-center justify-center gap-3 border px-3 py-2"
+                    style={{ borderColor: 'var(--line)', borderRadius: 10 }}
+                  >
+                    <span style={{ fontSize: '11px', color: altR?.color }}>
+                      {altR?.name}
+                    </span>
+                    <span style={{ color: 'var(--dim)', fontSize: '12px' }}>→</span>
+                    <span style={{ fontSize: '11px', color: neuR?.color }}>
+                      {neuR?.name}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--danger)' }}>
+                      · beschädigt
+                    </span>
+                  </div>
+                )
+              })()}
+            {popup.art === 'zurueck' && (
+              <p className="mt-2" style={{ fontSize: '11.5px', color: 'var(--dim)' }}>
+                Es liegt im Inventar. Der Schmied stellt es zum halben Preis
+                wieder her.
+              </p>
+            )}
 
             {popup.art === 'sieg' && (
               <div className="mt-3 flex flex-col gap-2">
@@ -924,6 +1020,25 @@ function DungeonFight({ onExit, daily = false }) {
                 })}
               </div>
             )}
+            {popup.art === 'niederlage' && popup.verlust && (
+              <p
+                className="mt-3 border px-3 py-2"
+                style={{
+                  fontSize: '13px',
+                  lineHeight: 1.55,
+                  color: 'var(--text)',
+                  borderColor: 'rgba(255,77,94,.5)',
+                  borderRadius: 10,
+                  background: 'rgba(255,77,94,.06)',
+                }}
+              >
+                Der{' '}
+                <span style={{ color: raritaet(ITEMS[popup.verlust.itemId])?.color }}>
+                  {ITEMS[popup.verlust.itemId]?.name}
+                </span>{' '}
+                bleibt beim {tuer.gegnerart} · Tür {tuer.nr} · {dungeon.name}.
+              </p>
+            )}
             {popup.art === 'niederlage' && (
               <div style={{ ...orbitron, color: 'var(--danger)', fontSize: '12px', marginTop: 10, lineHeight: 1.9 }}>
                 {daily ? (
@@ -938,7 +1053,9 @@ function DungeonFight({ onExit, daily = false }) {
                   <>
                     Aura erlischt
                     <br />
-                    Ein getragenes Item wird beschädigt
+                    {popup.verlust
+                      ? 'Hol es dir an derselben Tür zurück'
+                      : 'Du trägst nichts – nichts geht verloren'}
                     <br />
                     Durchgang beginnt wieder bei Tür 1
                   </>
@@ -948,14 +1065,20 @@ function DungeonFight({ onExit, daily = false }) {
 
             <button
               type="button"
-              onClick={popup.art === 'sieg' ? siegBestaetigen : niederlageBestaetigen}
+              onClick={
+                popup.art === 'sieg'
+                  ? siegBestaetigen
+                  : popup.art === 'zurueck'
+                    ? rueckholungBestaetigen
+                    : niederlageBestaetigen
+              }
               className="mt-4 w-full bg-transparent"
               style={{
                 ...orbitron,
                 letterSpacing: '2px',
                 fontSize: '11px',
-                color: popup.art === 'sieg' ? 'var(--glow)' : 'var(--danger)',
-                border: `1px solid ${popup.art === 'sieg' ? 'var(--glow)' : 'var(--danger)'}`,
+                color: popupFarbe,
+                border: `1px solid ${popupFarbe}`,
                 borderRadius: '11px',
                 padding: 11,
               }}

@@ -149,17 +149,23 @@ export const EFFECT_LABEL = {
 // Beim Aufwerten wachsen die Vorteile, die Nachteile bleiben wie sie sind
 export const AUFWERT_FAKTOR = 1.5
 
-// Item-ID einer aufgewerteten Ausführung: "<id>+<stufen>"
+// Item-ID einer Ausführung: "<id>+<stufen>" aufgewertet,
+// "<id>-<stufen>" abgenutzt – Letzteres entsteht, wenn im Dungeon
+// zurückgelassene Ausrüstung zurückgeholt wird.
 export function variantId(basisId, stufen) {
-  return stufen > 0 ? `${basisId}+${stufen}` : basisId
+  if (stufen > 0) return `${basisId}+${stufen}`
+  if (stufen < 0) return `${basisId}-${-stufen}`
+  return basisId
 }
 
 function skaliere(effects, stufen) {
-  if (stufen <= 0) return { ...effects }
+  if (stufen === 0) return { ...effects }
   const out = {}
   for (const [key, wert] of Object.entries(effects)) {
     if (wert > 0) {
-      out[key] = Math.round(wert * Math.pow(AUFWERT_FAKTOR, stufen))
+      // Vorteile wachsen mit jeder Stufe und schrumpfen darunter, bleiben
+      // aber spürbar: mindestens 1
+      out[key] = Math.max(1, Math.round(wert * Math.pow(AUFWERT_FAKTOR, stufen)))
     } else {
       out[key] = wert // Nachteile skalieren nicht mit
     }
@@ -171,7 +177,8 @@ function baueItems() {
   const items = {}
   for (const eintrag of KATALOG) {
     const maxStufen = MAX_RARITAET - eintrag.rarity
-    for (let s = 0; s <= maxStufen; s++) {
+    // Auch die abgenutzten Stufen bis hinunter zu Gewöhnlich anlegen
+    for (let s = -eintrag.rarity; s <= maxStufen; s++) {
       const rar = eintrag.rarity + s
       const id = variantId(eintrag.id, s)
       items[id] = {
@@ -293,7 +300,8 @@ export function hochgestuft(itemId) {
 
 export function herabgestuft(itemId) {
   const item = ITEMS[itemId]
-  if (!item || item.rar == null || item.stufen <= 0) return null
+  // Gewöhnlich ist die unterste Stufe
+  if (!item || item.rar == null || item.rar <= 0) return null
   return variantId(item.basisId, item.stufen - 1)
 }
 

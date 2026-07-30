@@ -86,6 +86,9 @@ const initialState = {
   materials: { basalt: 0, knochen: 0, schatten: 0, wolf: 0 },
   daily: { date: null, doors: [], progress: 0, done: false, streak: 0, fight: null },
   damagedItems: {}, // im Dungeon beschädigte Items (itemId → true)
+  // Beim Tod zurückgelassene Ausrüstung, holbar durch einen erneuten Sieg
+  // an derselben Tür. Mehrere Verluste an verschiedenen Türen sind möglich.
+  lostItems: [],
   klasse: null,
   gender: null,
   onboarded: false,
@@ -123,6 +126,28 @@ function verteileBeute(state, drops) {
     }
   }
   return { inventory, materials, log }
+}
+
+/**
+ * Sucht verlorene Ausrüstung an einer bestimmten Tür. Gibt das alte und das
+ * um eine Stufe gesenkte Item zurück sowie die übrigen Einträge – oder null,
+ * wenn an dieser Tür nichts liegt.
+ */
+function holeVerloreneZurueck(state, dungeonId, doorIndex) {
+  const liste = state.lostItems ?? []
+  const idx = liste.findIndex(
+    (e) => e.dungeonId === dungeonId && e.doorIndex === doorIndex,
+  )
+  if (idx < 0) return null
+  const eintrag = liste[idx]
+  // Eine Rarität herunter, Gewöhnlich bleibt Gewöhnlich
+  const neu = herabgestuft(eintrag.itemId) ?? eintrag.itemId
+  return {
+    eintrag,
+    alt: eintrag.itemId,
+    neu,
+    rest: liste.filter((_, i) => i !== idx),
+  }
 }
 
 function withLog(log, text, extra = {}) {
@@ -450,10 +475,26 @@ function reducer(state, action) {
         )
       const beute = verteileBeute(state, drops)
 
+      // Hing an dieser Tür verlorene Ausrüstung, kehrt sie beschädigt und
+      // eine Stufe niedriger ins Inventar zurück – nicht in den Slot.
+      const geholt = holeVerloreneZurueck(state, dungeon.id, tuer.nr)
+      const inventory = geholt ? [...beute.inventory, geholt.neu] : beute.inventory
+      const damagedItems = geholt
+        ? { ...state.damagedItems, [geholt.neu]: true }
+        : state.damagedItems
+      const lostItems = geholt ? geholt.rest : (state.lostItems ?? [])
+      const beuteLog = geholt
+        ? withLog(beute.log, `${ITEMS[geholt.neu]?.name} zurückgeholt`, {
+            detail: `${raritaet(ITEMS[geholt.alt])?.name} → ${raritaet(ITEMS[geholt.neu])?.name} · beschädigt`,
+          })
+        : beute.log
+
       if (!tuer.boss) {
         let next = {
           ...state,
-          inventory: beute.inventory,
+          inventory,
+          damagedItems,
+          lostItems,
           materials: beute.materials,
           dungeon: {
             ...state.dungeon,
@@ -463,7 +504,7 @@ function reducer(state, action) {
             enemyHp: null,
             fight: null,
           },
-          log: withLog(beute.log, `Tür ${tuer.nr} geschafft`, {
+          log: withLog(beuteLog, `Tür ${tuer.nr} geschafft`, {
             detail: `${tuer.name} · ${tuer.anzahl}× ${tuer.gegnerart}`,
             xp: TUER_XP,
           }),
@@ -472,7 +513,7 @@ function reducer(state, action) {
         return next
       }
       // Bosssieg: Tor öffnet sich, doppelte Beute und XP
-      const log = withLog(beute.log, `${dungeon.boss} besiegt`, {
+      const log = withLog(beuteLog, `${dungeon.boss} besiegt`, {
         detail: `${dungeon.name} abgeschlossen`,
         xp: BOSS_XP,
       })
@@ -488,7 +529,9 @@ function reducer(state, action) {
           killed: 0,
           fight: null,
         },
-        inventory: beute.inventory,
+        inventory,
+        damagedItems,
+        lostItems,
         materials: beute.materials,
         lifetime: {
           ...state.lifetime,
@@ -689,37 +732,44 @@ function reducer(state, action) {
       }
     }
     case 'DUNGEON_DEFEAT': {
-      // Niederlage: Aura erlischt, Fortschritt weg, ein getragenes Item leidet
-      const getragene = Object.entries(state.equipment).filter(([, id]) => id)
-      let equipment = state.equipment
-      let damagedItems = state.damagedItems
-      let beschaedigt = null
-      if (getragene.length > 0) {
-        const [slot, itemId] =
-          getragene[Math.floor(Math.random() * getragene.length)]
-        const schlechter = herabgestuft(itemId)
-        if (schlechter) {
-          // Eine Rarität herunter, Gewöhnlich bleibt Gewöhnlich
-          equipment = { ...equipment, [slot]: schlechter }
-          damagedItems = { ...damagedItems, [schlechter]: true }
-          beschaedigt = { alt: itemId, neu: schlechter }
-        } else {
-          damagedItems = { ...damagedItems, [itemId]: true }
-          beschaedigt = { alt: itemId, neu: itemId }
-        }
-      }
+      // Niederlage: Aura erlischt, Fortschritt weg, ein getragenes Item
+      // bleibt beim Gegner zurück. Herabgestuft wird es erst bei der
+      // Rückholung – hier verliert der Jäger es nur.
       const dungeon = findDungeon(state.dungeon.run)
+      const tuer = dungeon?.tueren.find((t) => t.nr === state.dungeon.door)
+      const getragene = Object.entries(state.equipment).filter(([, id]) => id)
+      // Die Kampfansicht wählt das Teil, damit das Popup es benennen kann;
+      // ohne Vorgabe entscheidet der Zufall hier.
+      const gewaehlt =
+        getragene.find(([slot]) => slot === action.slot) ??
+        (getragene.length > 0
+          ? getragene[Math.floor(Math.random() * getragene.length)]
+          : null)
+
+      let equipment = state.equipment
+      let lostItems = state.lostItems ?? []
+      let verlust = null
+      if (gewaehlt) {
+        const [slot, itemId] = gewaehlt
+        equipment = { ...equipment, [slot]: null }
+        verlust = {
+          itemId,
+          rarity: ITEMS[itemId]?.rar ?? 0,
+          damaged: !!state.damagedItems?.[itemId],
+          dungeonId: state.dungeon.run,
+          doorIndex: state.dungeon.door,
+          enemyName: tuer?.gegnerart ?? tuer?.name ?? 'Unbekannt',
+          date: todayKey(),
+        }
+        lostItems = [...lostItems, verlust]
+      }
+
       let log = withLog(state.log, 'Rückzug aus dem Dungeon', {
         detail: `${dungeon?.name ?? 'Dungeon'} · Fortschritt verloren`,
       })
-      if (beschaedigt) {
-        const alt = ITEMS[beschaedigt.alt]
-        const neu = ITEMS[beschaedigt.neu]
-        log = withLog(log, `${alt.name} beschädigt`, {
-          detail:
-            beschaedigt.alt === beschaedigt.neu
-              ? 'Bereits gewöhnlich – keine weitere Stufe'
-              : `${raritaet(alt)?.name} → ${raritaet(neu)?.name}`,
+      if (verlust) {
+        log = withLog(log, `${ITEMS[verlust.itemId]?.name} zurückgelassen`, {
+          detail: `${verlust.enemyName} · Tür ${verlust.doorIndex} · ${dungeon?.name ?? 'Dungeon'}`,
         })
       }
       log = withLog(log, 'Deine Aura ist erloschen', {
@@ -729,7 +779,7 @@ function reducer(state, action) {
         ...state,
         aura: 0,
         equipment,
-        damagedItems,
+        lostItems,
         dungeon: {
           ...state.dungeon,
           run: null,
@@ -907,11 +957,26 @@ function migriereSpielstand(gespeichert) {
     const ziel = ALTE_MATERIALIEN[sorte] ?? sorte
     if (ziel in materials) materials[ziel] += menge ?? 0
   }
+  // Ältere Spielstände kennen die verlorene Ausrüstung noch nicht.
+  // Einträge ohne bekanntes Item oder Dungeon wären nicht mehr einlösbar
+  // und fliegen raus, statt als Karteileiche im Panel zu stehen.
+  const lostItems = (gespeichert.lostItems ?? [])
+    .map((e) => {
+      const itemId = migriereItemId(e?.itemId)
+      return {
+        ...e,
+        itemId,
+        rarity: ITEMS[itemId]?.rar ?? e?.rarity ?? 0,
+        damaged: !!e?.damaged,
+      }
+    })
+    .filter((e) => ITEMS[e.itemId] && findDungeon(e.dungeonId))
   return {
     ...gespeichert,
     inventory,
     equipment,
     damagedItems,
+    lostItems,
     materials,
     gender: normalizeGender(gespeichert.gender),
   }
