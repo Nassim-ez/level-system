@@ -82,12 +82,12 @@ const ART = {
 <g class="glowline" stroke="#8fe0ff" stroke-width="1.8" fill="none" opacity=".8">
  <path d="M86 68 q14 -6 28 0"/><path d="M100 78 v34"/><path d="M90 96 h20"/></g>
 <g class="eye" fill="#9fe6ff"><circle cx="94" cy="40" r="2.6"/><circle cx="106" cy="40" r="2.6"/></g>`,
-  kobold: `<g fill="#1a1218" stroke="#7a3d4a" stroke-width="1.5">
+  kobold: `<g fill="#101c18" stroke="#3d7a52" stroke-width="1.5">
  <path d="M100 60 q16 0 18 16 q0 12 -10 16 l2 10 q16 6 18 22 l4 38 q-30 8 -64 0 l4 -38 q2 -16 18 -22 l2 -10 q-10 -4 -10 -16 q2 -16 18 -16 z"/>
  <path d="M82 66 l-20 -12 l14 22 z"/><path d="M118 66 l20 -12 l-14 22 z"/>
  <path d="M84 162 l-6 26 q8 6 14 2 l2 -24 z"/><path d="M116 162 l6 26 q-8 6 -14 2 l-2 -24 z"/></g>
 <g fill="#dfeaf5"><path d="M94 88 l3 6 l3 -6 z"/><path d="M104 88 l3 6 l2 -6 z"/></g>
-<g class="eye" fill="#ff9a6b"><circle cx="93" cy="72" r="2.6"/><circle cx="107" cy="72" r="2.6"/></g>`,
+<g class="eye" fill="#8dff9f"><circle cx="93" cy="72" r="2.6"/><circle cx="107" cy="72" r="2.6"/></g>`,
   skelett: `<g fill="none" stroke="#c4d6e8" stroke-width="2.2" stroke-linecap="round">
  <ellipse cx="100" cy="46" rx="15" ry="17"/>
  <path d="M92 58 q8 6 16 0"/>
