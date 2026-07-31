@@ -11,7 +11,7 @@
   --text: #d7ecff;
   --dim: #6f8db0;
   --danger: #ff4d5e;
-  --ok: #4dffa6;
+  --amber: #ffb347;
 }
 
 body {
@@ -426,7 +426,7 @@ h4 {
 }
 /* Mystisch: prismatischer Verlauf */
 .prisma {
-  background: linear-gradient(120deg, #ff9bd0, #9bd0ff, #c8ff9b, #ffd79b, #ff9bd0);
+  background: linear-gradient(120deg, #ff9bd0, #9bd0ff, #cfe8ff, #ffd79b, #ff9bd0);
   background-size: 300% 300%;
   animation: prism 4s linear infinite;
   font-weight: 700;

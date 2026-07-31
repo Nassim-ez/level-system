@@ -103,7 +103,7 @@ function Rang() {
           className="mt-4"
           style={{
             fontSize: '13px',
-            color: state.rankTestActive ? 'var(--ok)' : 'var(--text)',
+            color: state.rankTestActive ? 'var(--xp)' : 'var(--text)',
           }}
         >
           {state.rankTestActive

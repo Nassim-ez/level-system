@@ -22,18 +22,18 @@ function QuestRow({ name, target, stat, xp, hinweis, done, onComplete }) {
     <div
       className="flex items-center justify-between gap-3 border p-3"
       style={{
-        borderColor: done ? 'rgba(77,255,166,.4)' : 'var(--line)',
+        borderColor: done ? 'rgba(143,224,255,.4)' : 'var(--line)',
         borderRadius: '12px',
       }}
     >
       <div className="min-w-0">
         <p
           className="text-[16px] font-semibold"
-          style={done ? { color: 'var(--ok)' } : undefined}
+          style={done ? { color: 'var(--xp)' } : undefined}
         >
           {name}
           {target && (
-            <span style={{ color: done ? 'var(--ok)' : 'var(--xp)' }}>
+            <span style={{ color: 'var(--xp)' }}>
               {' '}
               · {target}
             </span>
@@ -53,8 +53,8 @@ function QuestRow({ name, target, stat, xp, hinweis, done, onComplete }) {
             ...orbitron,
             fontSize: '10px',
             letterSpacing: '2px',
-            color: 'var(--ok)',
-            textShadow: '0 0 8px rgba(77,255,166,.6)',
+            color: 'var(--xp)',
+            textShadow: '0 0 8px rgba(143,224,255,.6)',
           }}
         >
           ✓ ERLEDIGT
@@ -354,7 +354,7 @@ function Quests() {
                   className="flex items-center justify-between gap-3 border p-3"
                   style={{
                     borderColor: task.done
-                      ? 'rgba(77,255,166,.4)'
+                      ? 'rgba(143,224,255,.4)'
                       : 'var(--line)',
                     borderRadius: '12px',
                   }}
@@ -364,7 +364,7 @@ function Quests() {
                     style={
                       task.done
                         ? {
-                            color: 'var(--ok)',
+                            color: 'var(--xp)',
                             textDecoration: 'line-through',
                           }
                         : undefined
@@ -375,7 +375,7 @@ function Quests() {
                   {task.done ? (
                     <span
                       className="shrink-0"
-                      style={{ fontSize: '12px', color: 'var(--ok)' }}
+                      style={{ fontSize: '12px', color: 'var(--xp)' }}
                     >
                       erledigt
                     </span>
@@ -405,8 +405,8 @@ function Quests() {
                         }
                         className="flex h-[26px] w-[26px] items-center justify-center bg-transparent leading-none"
                         style={{
-                          border: '1px solid var(--ok)',
-                          color: 'var(--ok)',
+                          border: '1px solid var(--xp)',
+                          color: 'var(--xp)',
                           borderRadius: '8px',
                           fontSize: '13px',
                         }}

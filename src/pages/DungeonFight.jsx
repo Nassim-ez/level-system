@@ -80,7 +80,7 @@ function Leiste({ wert, max, farbe, glow, hoehe = 9, mine }) {
       style={{
         height: hoehe,
         background: '#140c12',
-        borderColor: mine ? '#1b4a38' : '#3a1a22',
+        borderColor: mine ? '#1b3a5c' : '#3a1a22',
       }}
     >
       <div

@@ -324,7 +324,7 @@ function Tuerkarte({ state, dispatch, dungeon, onFight }) {
               (e) => e.dungeonId === dungeon.id && e.doorIndex === tuer.nr,
             )
             const farbe = fertig
-              ? 'var(--ok)'
+              ? 'var(--xp)'
               : offen
                 ? tuer.boss
                   ? 'var(--danger)'
