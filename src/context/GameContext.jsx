@@ -409,6 +409,14 @@ function reducer(state, action) {
       localStorage.removeItem(STORAGE_KEY)
       return { ...initialState }
     }
+    case 'SAVE_EXPORTED': {
+      return {
+        ...state,
+        log: withLog(state.log, 'Spielstand gesichert', {
+          detail: action.dateiname ?? 'Datei heruntergeladen',
+        }),
+      }
+    }
     case 'SET_TITLE': {
       if (!state.unlockedTitles.includes(action.id)) return state
       return { ...state, title: TITLES[action.id].name }
@@ -990,6 +998,86 @@ function loadState() {
   } catch {
     return initialState
   }
+}
+
+// ---------------------------------------------------------------------------
+// Sicherung: Spielstand als Datei aus der App heraus und wieder hinein
+// ---------------------------------------------------------------------------
+
+// Erhöhen, sobald sich das Dateiformat so ändert, dass ältere Dateien
+// besonders behandelt werden müssen
+export const SAVE_VERSION = 1
+
+/** Spielstand als Datei-Inhalt, mit Version und Zeitstempel */
+export function exportiereSpielstand(state) {
+  return JSON.stringify(
+    { ...state, version: SAVE_VERSION, exportedAt: new Date().toISOString() },
+    null,
+    2,
+  )
+}
+
+/** Dateiname der Sicherung, z. B. system-save-2026-07-31.json */
+export function sicherungsName(datum = new Date()) {
+  return `system-save-${todayKey(datum)}.json`
+}
+
+/**
+ * Prüft den Inhalt einer Sicherungsdatei. Gibt entweder die Eckdaten
+ * zurück oder eine Meldung, warum die Datei nicht taugt. Der Spielstand
+ * wird dabei nicht angefasst.
+ */
+export function pruefeSicherung(text) {
+  let roh
+  try {
+    roh = JSON.parse(text)
+  } catch {
+    return { ok: false, fehler: 'Die Datei enthält kein lesbares JSON.' }
+  }
+  if (!roh || typeof roh !== 'object' || Array.isArray(roh)) {
+    return { ok: false, fehler: 'Die Datei enthält keinen Spielstand.' }
+  }
+  // Ein Spielstand ohne diese Kerne ist keiner – egal wie alt er ist
+  const kern = ['level', 'xp', 'rank']
+  const fehlend = kern.filter((k) => roh[k] == null)
+  if (fehlend.length === kern.length) {
+    return { ok: false, fehler: 'Die Datei sieht nicht nach einem Spielstand aus.' }
+  }
+  if (typeof roh.level !== 'number' || typeof roh.xp !== 'number') {
+    return { ok: false, fehler: 'Level oder XP fehlen bzw. sind beschädigt.' }
+  }
+  // Fehlende Felder älterer Versionen füllt die vorhandene Migration auf.
+  // version und exportedAt beschreiben die Datei, nicht den Spielstand,
+  // und bleiben deshalb draußen.
+  const { version, exportedAt, ...spielstand } = roh
+  const daten = migriereSpielstand({ ...initialState, ...spielstand })
+  return {
+    ok: true,
+    daten,
+    eckdaten: {
+      level: daten.level,
+      rank: daten.rank,
+      aura: daten.aura ?? 0,
+      name: daten.name,
+      exportedAt: exportedAt ?? null,
+      version: version ?? null,
+    },
+  }
+}
+
+/**
+ * Schreibt eine geprüfte Sicherung in den Speicher. Der Aufrufer lädt
+ * danach die App neu – erst dadurch wird der Spielstand aktiv.
+ * Ohne Reload bliebe der laufende Reducer-Zustand daneben stehen.
+ */
+export function uebernehmeSicherung(daten) {
+  const mitLog = {
+    ...daten,
+    log: withLog(daten.log ?? [], 'Spielstand eingespielt', {
+      detail: `Level ${daten.level} · Rang ${daten.rank}`,
+    }),
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(mitLog))
 }
 
 const GameContext = createContext(null)

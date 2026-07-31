@@ -1,6 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Panel from '../components/Panel.jsx'
-import { useGame } from '../context/GameContext.jsx'
+import {
+  useGame,
+  exportiereSpielstand,
+  sicherungsName,
+  pruefeSicherung,
+  uebernehmeSicherung,
+} from '../context/GameContext.jsx'
 import { todayKey } from '../data/quests.js'
 import { GENDERS } from '../data/gender.js'
 
@@ -14,6 +20,226 @@ function formatDatum(datum) {
   if (datum === todayKey(gestern)) return 'GESTERN'
   const [, m, d] = datum.split('-')
   return `${d}.${m}.`
+}
+
+/* --------------------------------------------------------------------- */
+/* Sicherung: Spielstand aus der App heraus und wieder hinein             */
+/* --------------------------------------------------------------------- */
+function datumLesbar(iso) {
+  if (!iso) return 'unbekannt'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'unbekannt'
+  return d.toLocaleDateString('de-DE')
+}
+
+function ImportConfirmPopup({ eckdaten, onCancel, onConfirm }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-6"
+      style={{ background: 'rgba(2,4,9,.7)', backdropFilter: 'blur(3px)' }}
+    >
+      <div
+        className="w-full max-w-[340px] rounded-[18px] border p-5 text-center"
+        style={{
+          background: 'var(--panel)',
+          borderColor: 'var(--danger)',
+          boxShadow: '0 0 40px rgba(255,77,94,.3)',
+        }}
+      >
+        <p
+          style={{
+            ...orbitron,
+            fontSize: '10px',
+            letterSpacing: '3px',
+            color: 'var(--danger)',
+          }}
+        >
+          ◆ SYSTEM
+        </p>
+        <p
+          className="mt-3"
+          style={{
+            ...orbitron,
+            fontSize: '20px',
+            color: 'var(--danger)',
+            textShadow: '0 0 14px rgba(255,77,94,.8)',
+          }}
+        >
+          ⚠ WARNUNG
+        </p>
+
+        <div
+          className="mt-4 border px-3 py-2"
+          style={{ borderColor: 'var(--line)', borderRadius: 10 }}
+        >
+          <p style={{ fontSize: '13.5px', color: 'var(--xp)', lineHeight: 1.6 }}>
+            Level {eckdaten.level} · Rang {eckdaten.rank} · Aura {eckdaten.aura}
+          </p>
+          <p style={{ fontSize: '11.5px', color: 'var(--dim)' }}>
+            erstellt am {datumLesbar(eckdaten.exportedAt)}
+          </p>
+        </div>
+
+        <p className="mt-3 text-[14px]">
+          Dieser Spielstand ersetzt deinen aktuellen. Was jetzt auf dem Gerät
+          liegt, ist danach fort.
+        </p>
+
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full bg-transparent px-4 py-2"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--dim)',
+              border: '1px solid var(--line)',
+              borderRadius: '10px',
+            }}
+          >
+            ABBRECHEN
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="w-full bg-transparent px-4 py-2"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--danger)',
+              border: '1px solid var(--danger)',
+              borderRadius: '10px',
+            }}
+          >
+            SPIELSTAND ERSETZEN
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Sicherung({ state, dispatch }) {
+  const [fehler, setFehler] = useState(null)
+  const [pruefung, setPruefung] = useState(null)
+  const dateiFeld = useRef(null)
+
+  function exportieren() {
+    const dateiname = sicherungsName()
+    const blob = new Blob([exportiereSpielstand(state)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = dateiname
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    setFehler(null)
+    dispatch({ type: 'SAVE_EXPORTED', dateiname })
+  }
+
+  function dateiGewaehlt(event) {
+    const datei = event.target.files?.[0]
+    // Feld leeren, damit dieselbe Datei erneut gewählt werden kann
+    event.target.value = ''
+    if (!datei) return
+    const leser = new FileReader()
+    leser.onerror = () => setFehler('Die Datei konnte nicht gelesen werden.')
+    leser.onload = () => {
+      const ergebnis = pruefeSicherung(String(leser.result))
+      if (!ergebnis.ok) {
+        setPruefung(null)
+        setFehler(ergebnis.fehler)
+        return
+      }
+      setFehler(null)
+      setPruefung(ergebnis)
+    }
+    leser.readAsText(datei)
+  }
+
+  return (
+    <>
+      <Panel title="SICHERUNG">
+        <p style={{ fontSize: '13px', color: 'var(--dim)' }}>
+          Dein Spielstand liegt nur auf diesem Gerät. Sichere ihn regelmäßig.
+        </p>
+
+        <div className="mt-3 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={exportieren}
+            className="w-full bg-transparent px-4 py-2.5"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--glow)',
+              border: '1px solid var(--glow)',
+              borderRadius: '10px',
+            }}
+          >
+            EXPORTIEREN
+          </button>
+          <button
+            type="button"
+            onClick={() => dateiFeld.current?.click()}
+            className="w-full bg-transparent px-4 py-2.5"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--xp)',
+              border: '1px solid var(--xp)',
+              borderRadius: '10px',
+            }}
+          >
+            IMPORTIEREN
+          </button>
+          <input
+            ref={dateiFeld}
+            type="file"
+            accept="application/json,.json"
+            onChange={dateiGewaehlt}
+            className="hidden"
+          />
+        </div>
+
+        {fehler && (
+          <p
+            className="mt-3 border px-3 py-2"
+            style={{
+              fontSize: '12.5px',
+              lineHeight: 1.5,
+              color: 'var(--danger)',
+              borderColor: 'rgba(255,77,94,.5)',
+              background: 'rgba(255,77,94,.06)',
+              borderRadius: 10,
+            }}
+          >
+            {fehler} Dein Spielstand bleibt unverändert.
+          </p>
+        )}
+      </Panel>
+
+      {pruefung && (
+        <ImportConfirmPopup
+          eckdaten={pruefung.eckdaten}
+          onCancel={() => setPruefung(null)}
+          onConfirm={() => {
+            uebernehmeSicherung(pruefung.daten)
+            window.location.reload()
+          }}
+        />
+      )}
+    </>
+  )
 }
 
 function ResetConfirmPopup({ onCancel, onConfirm }) {
@@ -232,6 +458,8 @@ function Log() {
         </div>
       )}
       </Panel>
+
+      <Sicherung state={state} dispatch={dispatch} />
 
       <Panel
         title="GEFAHRENZONE"
