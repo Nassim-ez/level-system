@@ -4,13 +4,16 @@ import SlotIcon from '../components/SlotIcons.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import {
   ITEMS,
+  MATERIALIEN,
   SLOT_LABELS,
   EFFECT_LABEL,
   effektListe,
   istVorteil,
   summiereEffekte,
+  zaehleSetTeile,
   raritaet,
 } from '../data/items.js'
+import { SETS, SET_LISTE, MAX_SET_TEILE, stufeErreicht } from '../data/sets.js'
 import Haendler from './Haendler.jsx'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
@@ -28,6 +31,8 @@ function Kachel({ slot, itemId, gewaehlt, beschaedigt, blitzt, onSelect }) {
   const item = itemId ? ITEMS[itemId] : null
   const rar = raritaet(item)
   const belegt = !!item
+  // Punkt in der Materialfarbe: zeigt auf einen Blick, was zusammengehört
+  const material = item ? MATERIALIEN[item.material] : null
   // Rot bleibt Schaden vorbehalten: die Rarität färbt Rahmen und Symbol,
   // Beschädigung zeigt allein das Kreuz-Abzeichen
   const farbe = belegt ? (rar?.color ?? 'var(--xp)') : LEER_FARBE
@@ -86,6 +91,21 @@ function Kachel({ slot, itemId, gewaehlt, beschaedigt, blitzt, onSelect }) {
         >
           +
         </span>
+      )}
+      {belegt && material && (
+        <span
+          className="absolute"
+          title={material.name}
+          style={{
+            bottom: 4,
+            left: 4,
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background: material.color,
+            boxShadow: `0 0 5px ${material.color}`,
+          }}
+        />
       )}
       {belegt && beschaedigt && (
         <span
@@ -183,6 +203,8 @@ function Charakterfeld({ name, rank }) {
 /* --------------------------------------------------------------------- */
 function BoniChips({ equipment }) {
   const chips = Object.entries(summiereEffekte(equipment))
+    // Was sich gegenseitig aufhebt, ist kein Bonus und wäre nur „−0%"
+    .filter(([, wert]) => wert !== 0)
     .map(([key, wert]) => ({
       key,
       wert,
@@ -222,6 +244,104 @@ function BoniChips({ equipment }) {
         )
       })}
     </div>
+  )
+}
+
+/* --------------------------------------------------------------------- */
+/* Set-Boni – je Material, sobald mindestens ein Teil getragen wird        */
+/* --------------------------------------------------------------------- */
+function stufenText(effects) {
+  return Object.entries(effects)
+    .map(([key, wert]) => {
+      const label = EFFECT_LABEL[key] ?? key
+      return `${wert > 0 ? '+' : '−'}${Math.abs(wert)}% ${label}`
+    })
+    .join(' · ')
+}
+
+function SetZeile({ set, anzahl }) {
+  const material = MATERIALIEN[set.id]
+  const farbe = material?.color ?? 'var(--xp)'
+  const anteil = Math.min(100, (anzahl / MAX_SET_TEILE) * 100)
+
+  return (
+    <div
+      className="border p-2"
+      style={{ borderColor: 'var(--line)', borderRadius: 12 }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[14px] font-semibold" style={{ color: farbe }}>
+          {set.name}
+        </p>
+        <span
+          className="shrink-0"
+          style={{ ...orbitron, fontSize: 10, letterSpacing: '1px', color: 'var(--dim)' }}
+        >
+          {anzahl} / {MAX_SET_TEILE}
+        </span>
+      </div>
+
+      {/* Fortschritt in der Materialfarbe */}
+      <div
+        className="mt-1.5 overflow-hidden"
+        style={{ height: 4, borderRadius: 3, background: 'rgba(27,58,92,.6)' }}
+      >
+        <div
+          style={{
+            width: `${anteil}%`,
+            height: '100%',
+            background: farbe,
+            transition: 'width .3s',
+          }}
+        />
+      </div>
+
+      <p className="mt-1" style={{ fontSize: '11px', color: 'var(--dim)', lineHeight: 1.4 }}>
+        {set.beschreibung}
+      </p>
+
+      <div className="mt-1.5 flex flex-col gap-0.5">
+        {set.stufen.map((stufe) => {
+          const aktiv = stufeErreicht(stufe, anzahl)
+          return (
+            <p
+              key={stufe.teile}
+              style={{
+                fontSize: '11.5px',
+                lineHeight: 1.45,
+                color: aktiv ? 'var(--xp)' : 'var(--dim)',
+                fontWeight: aktiv ? 600 : 400,
+              }}
+            >
+              {aktiv ? '◆' : '◇'} {stufe.teile} Teile: {stufenText(stufe.effects)}
+            </p>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function SetBoni({ equipment }) {
+  const zaehler = zaehleSetTeile(equipment)
+  // Nur Sets zeigen, von denen wirklich etwas am Körper ist
+  const getragen = SET_LISTE.filter((set) => (zaehler[set.id] ?? 0) > 0).sort(
+    (a, b) => (zaehler[b.id] ?? 0) - (zaehler[a.id] ?? 0),
+  )
+  if (getragen.length === 0) return null
+
+  return (
+    <Panel title="SET-BONI">
+      <div className="flex flex-col gap-2">
+        {getragen.map((set) => (
+          <SetZeile key={set.id} set={set} anzahl={zaehler[set.id]} />
+        ))}
+      </div>
+      <p className="mt-3" style={{ fontSize: '11px', color: 'var(--dim)' }}>
+        Gezählt wird, was du trägst – ein Teil je Slot. Beide Stufen wirken
+        zusammen, sobald du vier Teile eines Materials anlegst.
+      </p>
+    </Panel>
   )
 }
 
@@ -291,6 +411,11 @@ function ItemZeile({ item, slot, beschaedigt, angelegt, onAction }) {
             </>
           )}
         </p>
+        {SETS[item.material] && (
+          <p style={{ fontSize: '11px', color: MATERIALIEN[item.material]?.color }}>
+            {SETS[item.material].name}
+          </p>
+        )}
         <span
           className="mt-0.5 inline-block px-1.5"
           style={{
@@ -390,6 +515,8 @@ function Charakter() {
           <BoniChips equipment={state.equipment} />
         </div>
       </Panel>
+
+      <SetBoni equipment={state.equipment} />
 
       <Panel title={SLOT_LABELS[slot]}>
         <div className="flex flex-col gap-2">

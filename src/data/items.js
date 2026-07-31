@@ -1,3 +1,5 @@
+import { setBoni } from './sets.js'
+
 // ---------------------------------------------------------------------------
 // Raritäten – sechs Stufen, Index 0..5 (Farben aus haendler-mockup.html)
 // ---------------------------------------------------------------------------
@@ -228,7 +230,34 @@ function baueItems() {
 export const ITEMS = baueItems()
 
 // ---------------------------------------------------------------------------
-// Wirksame Effekte der getragenen Ausrüstung, aufsummiert
+// Set-Zählung: getragene Teile je Material, ein Teil pro Slot
+// ---------------------------------------------------------------------------
+export function zaehleSetTeile(equipment) {
+  const zaehler = {}
+  for (const [slot, id] of Object.entries(equipment ?? {})) {
+    const item = ITEMS[id]
+    // Nur was tatsächlich in einem Slot steckt – Verbrauchsgüter zählen nicht
+    if (!item?.material || item.slot !== slot) continue
+    zaehler[item.material] = (zaehler[item.material] ?? 0) + 1
+  }
+  return zaehler
+}
+
+/** Set-Effekte der getragenen Ausrüstung, über alle Materialien summiert */
+export function summiereSetBoni(equipment) {
+  const summe = {}
+  for (const [material, anzahl] of Object.entries(zaehleSetTeile(equipment))) {
+    for (const [key, wert] of Object.entries(setBoni(material, anzahl))) {
+      summe[key] = (summe[key] ?? 0) + wert
+    }
+  }
+  return summe
+}
+
+// ---------------------------------------------------------------------------
+// Wirksame Effekte der getragenen Ausrüstung, aufsummiert.
+// Set-Boni fließen in dieselbe Summe, damit sie überall dort wirken, wo
+// auch die Item-Effekte greifen – Kampf, Blockchance, Beute, Anzeige.
 // ---------------------------------------------------------------------------
 export function summiereEffekte(equipment) {
   const summe = {}
@@ -238,6 +267,9 @@ export function summiereEffekte(equipment) {
     for (const [key, wert] of Object.entries(item.effects)) {
       summe[key] = (summe[key] ?? 0) + wert
     }
+  }
+  for (const [key, wert] of Object.entries(summiereSetBoni(equipment))) {
+    summe[key] = (summe[key] ?? 0) + wert
   }
   return summe
 }
