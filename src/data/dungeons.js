@@ -11,7 +11,7 @@
 
 export const GEFAHRSTUFEN = {
   leicht: { name: 'Leicht', color: 'var(--xp)' },
-  mittel: { name: 'Mittel', color: 'var(--amber)' },
+  mittel: { name: 'Mittel', color: 'var(--warn)' },
   stark: { name: 'Stark', color: '#ff9440' },
   zustark: { name: 'Zu stark', color: 'var(--danger)' },
 }

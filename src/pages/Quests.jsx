@@ -14,6 +14,7 @@ import {
   needsNegatives,
 } from '../data/quests.js'
 import { RANK_TESTS, buildRankTest, nextRank } from '../data/ranks.js'
+import Uebungen from './Uebungen.jsx'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -85,6 +86,7 @@ function Quests() {
   const { dayType, doneToday, questProgress, drawnTask } = state
   const [stepsInput, setStepsInput] = useState('')
   const [taskInput, setTaskInput] = useState('')
+  const [beiUebungen, setBeiUebungen] = useState(false)
 
   const plan = DAY_PLANS[dayType] ?? []
   const bonusPlan = BONUS_PLANS[dayType] ?? []
@@ -107,8 +109,32 @@ function Quests() {
     : null
   const rankProgress = questProgress.rankTest ?? {}
 
+  if (beiUebungen) return <Uebungen onZurueck={() => setBeiUebungen(false)} />
+
   return (
     <div className="flex flex-col gap-4">
+      <Panel title="ÜBUNGSWISSEN">
+        <p style={{ fontSize: '13px', color: 'var(--dim)' }}>
+          Ausführung, häufige Fehler, beanspruchte Muskeln und die Leiter von
+          leicht nach schwer – zu jeder Übung des Systems.
+        </p>
+        <button
+          type="button"
+          onClick={() => setBeiUebungen(true)}
+          className="mt-3 w-full bg-transparent px-4 py-2.5"
+          style={{
+            ...orbitron,
+            fontSize: '11px',
+            letterSpacing: '2px',
+            color: 'var(--glow)',
+            border: '1px solid var(--glow)',
+            borderRadius: '10px',
+          }}
+        >
+          ÜBUNGEN ANSEHEN
+        </button>
+      </Panel>
+
       {test && (
         <Panel title="AUFSTIEGSPRÜFUNG" accent="var(--xp)">
           <p

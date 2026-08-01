@@ -11,7 +11,8 @@
   --text: #d7ecff;
   --dim: #6f8db0;
   --danger: #ff4d5e;
-  --amber: #ffb347;
+  /* Amber steht für Warnungen und Ankündigungen */
+  --warn: #ffb347;
 }
 
 body {
