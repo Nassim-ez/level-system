@@ -142,7 +142,7 @@ function snapshot(state) {
 }
 
 function PopupManager() {
-  const { state } = useGame()
+  const { state, dispatch } = useGame()
   const [queue, setQueue] = useState([])
   const prev = useRef(snapshot(state))
 
@@ -167,12 +167,54 @@ function PopupManager() {
         })
       }
     }
+    // Beim Rangaufstieg gewechselte Übungsstufen anschließend zeigen
+    for (const w of state.stufenWechsel ?? []) {
+      add.push({ type: 'stufe', ...w })
+    }
     if (add.length > 0) setQueue((q) => [...q, ...add])
   }, [state])
 
   const current = queue[0]
   if (!current) return null
-  const close = () => setQueue((q) => q.slice(1))
+  const close = () => {
+    if (current.type === 'stufe') dispatch({ type: 'CLEAR_STUFENWECHSEL' })
+    setQueue((q) => q.slice(1))
+  }
+
+  if (current.type === 'stufe') {
+    return (
+      <SystemPopup title="NEUE ÜBUNGSSTUFE" onClose={close}>
+        <p className="mt-2 text-[14px]" style={{ color: 'var(--dim)' }}>
+          {current.uebungName}
+        </p>
+        <div
+          className="mt-3 border px-3 py-2"
+          style={{ borderColor: 'var(--line)', borderRadius: 10 }}
+        >
+          <p style={{ fontSize: '13px', color: 'var(--dim)' }}>{current.alt}</p>
+          <p style={{ fontSize: '12px', color: 'var(--dim)' }}>↓</p>
+          <p
+            style={{
+              fontSize: '15px',
+              fontWeight: 600,
+              color: 'var(--xp)',
+            }}
+          >
+            {current.neu}
+          </p>
+        </div>
+        {current.tipp && (
+          <p className="mt-2 text-[13px]" style={{ lineHeight: 1.5 }}>
+            {current.tipp}
+          </p>
+        )}
+        <p className="mt-3" style={{ fontSize: '12px', color: 'var(--warn)', lineHeight: 1.5 }}>
+          Die schwerere Stufe erlaubt weniger Wiederholungen – dein Tagesziel
+          wurde entsprechend zurückgesetzt.
+        </p>
+      </SystemPopup>
+    )
+  }
 
   if (current.type === 'level') {
     return (

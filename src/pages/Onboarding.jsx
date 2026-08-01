@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { useGame } from '../context/GameContext.jsx'
 import { GENDERS, anrede } from '../data/gender.js'
-import { QUESTS, rankFromMaxima, targetsFromMaxima } from '../data/quests.js'
+import {
+  QUESTS,
+  rankFromMaxima,
+  targetsFromMaxima,
+  aktuelleVariante,
+  startVarianten,
+} from '../data/quests.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -271,10 +277,12 @@ function Onboarding() {
           </p>
           <div className="mt-4 flex flex-col gap-2">
             {Object.entries(baseTargets).map(([key, ziel]) => {
-              // Ohne echte Klimmzüge startet man mit Negativ-Klimmzügen
-              const ersatz = key === 'klimmzuege' && ziel === 0
-              const quest = ersatz ? QUESTS.negativklimmzuege : QUESTS[key]
-              const anzeige = ersatz ? quest.festesZiel : ziel
+              // Name aus der Startvariante der Übungsleiter
+              const quest = QUESTS[key]
+              const variante = aktuelleVariante(key, {
+                rank,
+                varianten: startVarianten(maxima, rank),
+              })
               return (
                 <div
                   key={key}
@@ -285,7 +293,9 @@ function Onboarding() {
                     borderRadius: '12px',
                   }}
                 >
-                  <span className="text-[15px]">{quest.name}</span>
+                  <span className="min-w-0 pr-2 text-[15px]">
+                    {variante?.name ?? key}
+                  </span>
                   <span
                     style={{
                       ...orbitron,
@@ -294,7 +304,7 @@ function Onboarding() {
                       textShadow: '0 0 8px rgba(143,224,255,.6)',
                     }}
                   >
-                    {anzeige} {quest.unit}
+                    {ziel} {quest.unit}
                   </span>
                 </div>
               )
@@ -302,8 +312,8 @@ function Onboarding() {
           </div>
           {(maxima.klimmzuege || 0) === 0 && (
             <p className="mt-3" style={{ fontSize: '12px', color: 'var(--dim)' }}>
-              Noch keine Klimmzüge? Du startest mit Negativ-Klimmzügen
-              (langsam ablassen), bis der erste echte sitzt.
+              Noch keine Klimmzüge? Du beginnst auf der untersten Sprosse der
+              Leiter und arbeitest dich Stufe für Stufe zur Stange hoch.
             </p>
           )}
           <button
@@ -370,6 +380,7 @@ function Onboarding() {
                 gender,
                 rank,
                 baseTargets,
+                maxima,
               })
             }
             className="mt-6 bg-transparent px-6 py-3"

@@ -19,7 +19,6 @@ export const TEST_FACTOR_LATE = 1.7 // ab C→B, da die Tagesziele schon hoch si
 export const TEST_MINIMUM = 10 // Muskelübungen
 export const TEST_MINIMUM_KLIMMZUEGE = 2
 export const TEST_MAXIMUM_KLIMMZUEGE = 25 // mehr an einem Tag ist unrealistisch
-export const TEST_NEGATIVE_KLIMMZUEGE = 8 // solange Negativ-Ersatz aktiv
 
 export function testFactor(rank) {
   return RANKS.indexOf(rank) >= RANKS.indexOf('C')
@@ -27,10 +26,9 @@ export function testFactor(rank) {
     : TEST_FACTOR_EARLY
 }
 
-export function testTargetFor(questId, baseTargets, negatives = false, rank) {
+export function testTargetFor(questId, baseTargets, rank) {
   const faktor = testFactor(rank)
   if (questId === 'klimmzuege') {
-    if (negatives) return TEST_NEGATIVE_KLIMMZUEGE
     const ziel = Math.max(
       TEST_MINIMUM_KLIMMZUEGE,
       Math.ceil((baseTargets?.klimmzuege ?? 0) * faktor),
@@ -44,14 +42,12 @@ export function testTargetFor(questId, baseTargets, negatives = false, rank) {
 }
 
 // Friert die Prüfungsziele beim Freischalten ein
-export function buildRankTest(rank, baseTargets, negatives = false) {
+export function buildRankTest(rank, baseTargets) {
   const test = RANK_TESTS[rank]
   if (!test) return null
   return test.quests.map((quest) => ({
     quest,
-    // Bei aktiver Negativ-Ersetzung zählt die Negativ-Variante
-    negativ: quest === 'klimmzuege' && negatives,
-    ziel: testTargetFor(quest, baseTargets, negatives, rank),
+    ziel: testTargetFor(quest, baseTargets, rank),
   }))
 }
 

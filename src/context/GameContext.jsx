@@ -5,7 +5,12 @@ import {
   todayKey,
   POOL_XP,
   raiseTargets,
-  needsNegatives,
+  startVarianten,
+  variantenWechsel,
+  uebungZuQuest,
+  varianteOffen,
+  STUFENWECHSEL_ANTEIL,
+  EINSTIEG_ZIEL,
 } from '../data/quests.js'
 import { CLASSES } from '../data/classes.js'
 import { TITLES } from '../data/titles.js'
@@ -91,6 +96,10 @@ const initialState = {
   lostItems: [],
   klasse: null,
   gender: null,
+  // Selbst gewählte Übungsstufen, je Quest { index, rank }
+  varianten: {},
+  // Beim letzten Rangaufstieg gewechselte Stufen, bis das Popup sie zeigt
+  stufenWechsel: [],
   onboarded: false,
   unlockedTitles: ['neuling'],
   lifetime: { liegestuetze: 0, klimmzuege: 0, dungeons: 0, bestStreak: 0 },
@@ -218,11 +227,7 @@ function reducer(state, action) {
       if (next && level >= RANK_THRESHOLDS[next] && !rankTestActive) {
         rankTestActive = true
         // Ziele einmalig einfrieren, damit spätere Boni sie nicht verschieben
-        rankTestTasks = buildRankTest(
-          state.rank,
-          state.baseTargets,
-          needsNegatives(state),
-        )
+        rankTestTasks = buildRankTest(state.rank, state.baseTargets)
         log = withLog(log, 'Aufstiegsprüfung freigeschaltet', {
           detail: `Rang ${state.rank} → ${next}`,
         })
@@ -396,6 +401,11 @@ function reducer(state, action) {
         gender: normalizeGender(action.gender ?? state.gender),
         rank: action.rank,
         baseTargets: action.baseTargets ?? state.baseTargets,
+        // Wer eine Übung noch gar nicht schafft, startet auf der untersten
+        // Sprosse der Leiter statt bei der Variante seines Rangs
+        varianten: action.maxima
+          ? startVarianten(action.maxima, action.rank)
+          : state.varianten,
         level,
         xp: 0,
         xpGoal,
@@ -404,6 +414,26 @@ function reducer(state, action) {
           detail: `Rang ${action.rank} · Level ${level}`,
         }),
       }
+    }
+    case 'SET_VARIANTE': {
+      // Eigene Wahl der Übungsstufe, gilt bis zum nächsten Rangwechsel
+      const uebung = uebungZuQuest(action.questId)
+      const variante = uebung?.varianten?.[action.index]
+      if (!variante || !varianteOffen(variante, state.rank)) return state
+      return {
+        ...state,
+        varianten: {
+          ...state.varianten,
+          [action.questId]: { index: action.index, rank: state.rank },
+        },
+        log: withLog(state.log, `Tagesziel: ${variante.name}`, {
+          detail: `${uebung.name} · selbst gewählt`,
+        }),
+      }
+    }
+    case 'CLEAR_STUFENWECHSEL': {
+      if (!state.stufenWechsel?.length) return state
+      return { ...state, stufenWechsel: [] }
     }
     case 'RESET_GAME': {
       localStorage.removeItem(STORAGE_KEY)
@@ -859,7 +889,7 @@ function reducer(state, action) {
       const test = RANK_TESTS[state.rank]
       const tasks =
         state.rankTestTasks ??
-        buildRankTest(state.rank, state.baseTargets, needsNegatives(state))
+        buildRankTest(state.rank, state.baseTargets)
       const task = tasks?.find((t) => t.quest === action.taskId)
       if (!task) return state
       const prev = state.questProgress.rankTest ?? {}
@@ -891,24 +921,40 @@ function reducer(state, action) {
       const after = nextRank(newRank)
       const stillActive = !!after && state.level >= RANK_THRESHOLDS[after]
       // Alle Tagesziele um 15 % anheben
-      const baseTargets = raiseTargets(state.baseTargets)
+      let baseTargets = raiseTargets(state.baseTargets)
       let log = withLog(state.log, `Rang ${newRank} erreicht`, {
         detail: 'Aufstiegsprüfung bestanden · Tagesziele +15 %',
       })
       log = withLog(log, `${ITEMS[test.reward].name} erhalten`, {
         detail: 'Belohnung',
       })
-      const zwischenstand = { ...state, lifetime, baseTargets }
+
+      // Mit dem neuen Rang rücken Übungen eine Sprosse hoch. Die eigene
+      // Variantenwahl gilt nur bis zum Rangwechsel und fällt hier weg.
+      const wechsel = variantenWechsel(state, { ...state, rank: newRank, varianten: {} })
+      for (const w of wechsel) {
+        // Die schwerere Variante erlaubt weniger Wiederholungen
+        baseTargets = {
+          ...baseTargets,
+          [w.questId]: Math.ceil(
+            (state.baseTargets?.[w.questId] ?? 0) * STUFENWECHSEL_ANTEIL,
+          ),
+        }
+        log = withLog(log, `Neue Übungsstufe: ${w.neu}`, {
+          detail: `${w.alt} → ${w.neu} · Tagesziel auf ${baseTargets[w.questId]} gesetzt`,
+        })
+      }
+
       return {
         ...state,
         rank: newRank,
         rankTestActive: stillActive,
         // Folgt direkt die nächste Prüfung, deren Ziele neu einfrieren
-        rankTestTasks: stillActive
-          ? buildRankTest(newRank, baseTargets, needsNegatives(zwischenstand))
-          : null,
+        rankTestTasks: stillActive ? buildRankTest(newRank, baseTargets) : null,
         lifetime,
         baseTargets,
+        varianten: {},
+        stufenWechsel: wechsel,
         inventory: [...state.inventory, test.reward],
         questProgress: { ...state.questProgress, rankTest: {} },
         log,
@@ -979,6 +1025,17 @@ function migriereSpielstand(gespeichert) {
       }
     })
     .filter((e) => ITEMS[e.itemId] && findDungeon(e.dungeonId))
+  // Frühere Stände kannten die Negativ-Klimmzüge als eigene Quest-ID
+  const doneToday = (gespeichert.doneToday ?? []).map((id) =>
+    id === 'negativklimmzuege' ? 'klimmzuege' : id,
+  )
+  // Prüfungsaufgaben trugen ein negativ-Kennzeichen, das es nicht mehr gibt
+  const rankTestTasks = gespeichert.rankTestTasks
+    ? gespeichert.rankTestTasks.map(({ negativ: _negativ, ...rest }) => rest)
+    : gespeichert.rankTestTasks
+  const baseTargets = { ...initialState.baseTargets, ...gespeichert.baseTargets }
+  // Ohne Klimmzug-Ziel lief früher der Negativ-Ersatz mit festem Ziel
+  if (!baseTargets.klimmzuege) baseTargets.klimmzuege = EINSTIEG_ZIEL
   return {
     ...gespeichert,
     inventory,
@@ -986,6 +1043,11 @@ function migriereSpielstand(gespeichert) {
     damagedItems,
     lostItems,
     materials,
+    doneToday,
+    rankTestTasks,
+    baseTargets,
+    varianten: gespeichert.varianten ?? {},
+    stufenWechsel: gespeichert.stufenWechsel ?? [],
     gender: normalizeGender(gespeichert.gender),
   }
 }

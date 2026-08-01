@@ -3,6 +3,7 @@ import Panel from '../components/Panel.jsx'
 import Koerperkarte from '../components/Koerperkarte.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import { UEBUNGEN, KATEGORIE_NAMEN } from '../data/uebungen.js'
+import { QUESTS, aktuelleVariante } from '../data/quests.js'
 import { RANKS } from '../data/ranks.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
@@ -160,8 +161,12 @@ function Uebersicht({ onOeffnen, onZurueck }) {
 /* --------------------------------------------------------------------- */
 /* Detailansicht                                                          */
 /* --------------------------------------------------------------------- */
-function Detail({ uebung, rank, onZurueck }) {
+function Detail({ uebung, state, dispatch, onZurueck }) {
+  const rank = state.rank
   const eigenerIndex = RANKS.indexOf(rank)
+  // Gehört zu dieser Übung eine Tages-Quest? Dann ist die Stufe wählbar.
+  const questId = Object.values(QUESTS).find((q) => q.uebungId === uebung.id)?.id
+  const gewaehlt = questId ? aktuelleVariante(questId, state) : null
 
   return (
     <div className="flex flex-col gap-4">
@@ -256,11 +261,21 @@ function Detail({ uebung, rank, onZurueck }) {
       </Panel>
 
       <Panel title="VARIANTEN">
+        {questId && (
+          <p className="mb-2" style={{ fontSize: '11.5px', color: 'var(--dim)' }}>
+            Deine Wahl gilt bis zum nächsten Rangwechsel. Eine leichtere Stufe
+            lässt die Wiederholungszahl unverändert.
+          </p>
+        )}
         <div className="flex flex-col gap-2">
           {uebung.varianten.map((v, i) => {
             const index = RANKS.indexOf(v.rang)
             const gesperrt = index > eigenerIndex
-            const passend = !gesperrt && v.rang === rank
+            // Hervorgehoben wird, was gerade als Tagesziel gilt; ohne
+            // Quest-Bezug bleibt es beim Rangvergleich
+            const passend = gewaehlt
+              ? gewaehlt.index === i
+              : !gesperrt && v.rang === rank
             return (
               <div
                 key={i}
@@ -302,7 +317,7 @@ function Detail({ uebung, rank, onZurueck }) {
                           color: 'var(--glow)',
                         }}
                       >
-                        DEIN RANG
+                        {questId ? 'TAGESZIEL' : 'DEIN RANG'}
                       </span>
                     )}
                   </div>
@@ -310,6 +325,25 @@ function Detail({ uebung, rank, onZurueck }) {
                 <p className="mt-0.5" style={{ fontSize: '11.5px', color: 'var(--dim)' }}>
                   {v.tipp}
                 </p>
+                {questId && !gesperrt && !passend && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      dispatch({ type: 'SET_VARIANTE', questId, index: i })
+                    }
+                    className="mt-2 w-full bg-transparent px-3 py-1.5"
+                    style={{
+                      ...orbitron,
+                      fontSize: 9,
+                      letterSpacing: '1.5px',
+                      color: 'var(--glow)',
+                      border: '1px solid rgba(63,182,255,.5)',
+                      borderRadius: 9,
+                    }}
+                  >
+                    ALS TAGESZIEL WÄHLEN
+                  </button>
+                )}
               </div>
             )
           })}
@@ -334,16 +368,17 @@ function Hinweisfuss() {
 }
 
 /* --------------------------------------------------------------------- */
-function Uebungen({ onZurueck }) {
-  const { state } = useGame()
-  const [offen, setOffen] = useState(null)
+function Uebungen({ onZurueck, startUebung = null }) {
+  const { state, dispatch } = useGame()
+  const [offen, setOffen] = useState(startUebung)
   const uebung = offen ? UEBUNGEN.find((u) => u.id === offen) : null
 
   if (uebung) {
     return (
       <Detail
         uebung={uebung}
-        rank={state.rank}
+        state={state}
+        dispatch={dispatch}
         onZurueck={() => setOffen(null)}
       />
     )

@@ -1,49 +1,88 @@
+import { UEBUNGEN } from './uebungen.js'
+import { RANKS } from './ranks.js'
+
+// Jede Trainings-Quest zeigt auf eine Übung der Datenbank. Wie sie heißt,
+// entscheidet die Variante – die hängt am Rang oder an der eigenen Wahl.
 export const QUESTS = {
   liegestuetze: {
     id: 'liegestuetze',
-    name: 'Liegestütze',
+    uebungId: 'liegestuetze',
     unit: 'Wdh.',
     stat: 'STR',
     xp: 60,
   },
   kniebeugen: {
     id: 'kniebeugen',
-    name: 'Kniebeugen',
+    uebungId: 'kniebeugen',
     unit: 'Wdh.',
     stat: 'STR',
     xp: 60,
   },
   crunches: {
     id: 'crunches',
-    name: 'Crunches',
+    uebungId: 'crunches',
     unit: 'Wdh.',
     stat: 'VIT',
     xp: 60,
   },
   dehnen: {
     id: 'dehnen',
-    name: 'Dehnen',
+    uebungId: 'hueftbeuger',
     unit: 'Min.',
     stat: 'AGI',
     xp: 60,
   },
   klimmzuege: {
     id: 'klimmzuege',
-    name: 'Klimmzüge',
+    uebungId: 'klimmzuege',
     unit: 'Wdh.',
     stat: 'STR',
     xp: 60,
   },
-  // Ersatz, solange noch keine echten Klimmzüge geschafft werden
-  negativklimmzuege: {
-    id: 'negativklimmzuege',
-    name: 'Negativ-Klimmzüge',
-    unit: 'Wdh.',
-    stat: 'STR',
-    xp: 60,
-    hinweis: 'Hochspringen, dann langsam ablassen',
-    festesZiel: 5,
-  },
+}
+
+// ---------------------------------------------------------------------------
+// Varianten: welche Stufe der Leiter gilt gerade?
+// ---------------------------------------------------------------------------
+
+export function uebungZuQuest(questId) {
+  const uebungId = QUESTS[questId]?.uebungId
+  return uebungId ? UEBUNGEN.find((u) => u.id === uebungId) : null
+}
+
+/** Ist diese Variante beim gegebenen Rang schon freigeschaltet? */
+export function varianteOffen(variante, rank) {
+  return RANKS.indexOf(variante.rang) <= RANKS.indexOf(rank)
+}
+
+/**
+ * Automatischer Vorschlag: die schwerste Variante, deren Rang der Jäger
+ * bereits erreicht hat. Die Leitern beginnen sämtlich bei E, es bleibt
+ * also immer mindestens die erste übrig.
+ */
+export function vorgeschlagenerIndex(uebung, rank) {
+  if (!uebung?.varianten?.length) return 0
+  let treffer = 0
+  uebung.varianten.forEach((v, i) => {
+    if (varianteOffen(v, rank)) treffer = i
+  })
+  return treffer
+}
+
+/**
+ * Tatsächlich geltende Variante. Eine eigene Wahl schlägt den Vorschlag,
+ * gilt aber nur bis zum nächsten Rangwechsel – danach greift wieder die
+ * Automatik.
+ */
+export function aktuelleVariante(questId, state) {
+  const uebung = uebungZuQuest(questId)
+  if (!uebung) return null
+  const wahl = state?.varianten?.[questId]
+  const index =
+    wahl && wahl.rank === state.rank && uebung.varianten[wahl.index]
+      ? wahl.index
+      : vorgeschlagenerIndex(uebung, state?.rank ?? 'E')
+  return { ...uebung.varianten[index], index, uebung }
 }
 
 export const DAY_PLANS = {
@@ -63,17 +102,39 @@ export const BONUS_PLANS = {
 export const TARGET_FACTOR = 1.5 // Muskelübungen: etwas über dem Maximum
 export const RANK_UP_FACTOR = 1.15 // Steigerung pro Rang-Aufstieg
 
+// Startziel, wenn eine Übung noch gar nicht gelingt
+export const EINSTIEG_ZIEL = 5
+
 export function targetsFromMaxima(maxima) {
-  // Muskelübungen mindestens 1 – Klimmzüge dürfen 0 bleiben,
-  // dann übernehmen die Negativ-Klimmzüge.
-  const ziel = (wert) => Math.max(1, Math.ceil((wert || 0) * TARGET_FACTOR))
+  const ziel = (wert) =>
+    wert > 0 ? Math.max(1, Math.ceil(wert * TARGET_FACTOR)) : EINSTIEG_ZIEL
   return {
     liegestuetze: ziel(maxima.liegestuetze),
     kniebeugen: ziel(maxima.kniebeugen),
     crunches: ziel(maxima.crunches),
-    klimmzuege: Math.ceil((maxima.klimmzuege || 0) * TARGET_FACTOR),
+    klimmzuege: ziel(maxima.klimmzuege),
     dehnen: Math.max(1, Math.round(maxima.dehnen || 0)),
   }
+}
+
+/**
+ * Startvarianten aus der Einstufung. Wer eine Übung noch gar nicht schafft,
+ * beginnt auf der untersten Sprosse – bei Klimmzügen also beim schrägen
+ * Rudern statt an der Stange. Das ersetzt die frühere Sonderregel für
+ * Negativ-Klimmzüge.
+ */
+export function startVarianten(maxima, rank) {
+  const wahl = {}
+  for (const questId of Object.keys(QUESTS)) {
+    const uebung = uebungZuQuest(questId)
+    if (!uebung) continue
+    if ((maxima?.[questId] ?? 0) > 0) continue
+    // Nur wenn der Vorschlag überhaupt höher läge, lohnt der Eintrag
+    if (vorgeschlagenerIndex(uebung, rank) > 0) {
+      wahl[questId] = { index: 0, rank }
+    }
+  }
+  return wahl
 }
 
 export function raiseTargets(targets) {
@@ -84,19 +145,46 @@ export function raiseTargets(targets) {
   return raised
 }
 
-// Braucht noch Negativ-Klimmzüge? (noch nie echte Klimmzüge geloggt)
-export function needsNegatives(state) {
-  return (state.lifetime?.klimmzuege ?? 0) === 0
+// Liefert die anzuzeigende Quest: Name aus der Variante, Ziel aus den
+// persönlichen Tageszielen
+export function resolveQuest(id, state) {
+  const quest = QUESTS[id]
+  if (!quest) return null
+  const variante = aktuelleVariante(id, state)
+  return {
+    ...quest,
+    name: variante?.name ?? quest.id,
+    hinweis: variante?.tipp,
+    variante,
+    ziel: state.baseTargets?.[id] ?? 0,
+  }
 }
 
-// Liefert die tatsächlich anzuzeigende Quest inkl. persönlichem Tagesziel
-export function resolveQuest(id, state) {
-  const useNegatives = id === 'klimmzuege' && needsNegatives(state)
-  const quest = useNegatives ? QUESTS.negativklimmzuege : QUESTS[id]
-  const ziel =
-    quest.festesZiel ?? state.baseTargets?.[quest.id] ?? 0
-  return { ...quest, ziel }
+/**
+ * Vergleicht die geltenden Varianten vor und nach einem Rangwechsel.
+ * Liefert je Quest den Wechsel, damit die App ihn zeigen und das
+ * Tagesziel anpassen kann.
+ */
+export function variantenWechsel(vorher, nachher) {
+  const wechsel = []
+  for (const questId of Object.keys(QUESTS)) {
+    const alt = aktuelleVariante(questId, vorher)
+    const neu = aktuelleVariante(questId, nachher)
+    if (!alt || !neu || alt.index === neu.index) continue
+    wechsel.push({
+      questId,
+      uebungName: neu.uebung.name,
+      alt: alt.name,
+      neu: neu.name,
+      tipp: neu.tipp,
+      stufe: neu.stufe,
+    })
+  }
+  return wechsel
 }
+
+// Anteil, auf den das Tagesziel bei einer schwereren Variante fällt
+export const STUFENWECHSEL_ANTEIL = 0.6
 
 export const DAY_LABELS = {
   A: 'TAG A · KRAFT',

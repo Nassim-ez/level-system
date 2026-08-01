@@ -2,7 +2,6 @@ import { useState } from 'react'
 import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import {
-  QUESTS,
   DAY_PLANS,
   BONUS_PLANS,
   DAY_LABELS,
@@ -11,14 +10,38 @@ import {
   STEP_XP_PER_1000,
   stepXpMax,
   resolveQuest,
-  needsNegatives,
 } from '../data/quests.js'
 import { RANK_TESTS, buildRankTest, nextRank } from '../data/ranks.js'
 import Uebungen from './Uebungen.jsx'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
-function QuestRow({ name, target, stat, xp, hinweis, done, onComplete }) {
+// Öffnet die Übung, zu der diese Quest gehört
+function InfoKnopf({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Übung ansehen"
+      className="ml-1.5 inline-grid shrink-0 place-items-center align-middle"
+      style={{
+        width: 16,
+        height: 16,
+        borderRadius: '50%',
+        border: '1px solid rgba(63,182,255,.5)',
+        background: 'transparent',
+        ...orbitron,
+        fontSize: 9,
+        lineHeight: 1,
+        color: 'var(--glow)',
+      }}
+    >
+      i
+    </button>
+  )
+}
+
+function QuestRow({ name, target, stat, xp, hinweis, done, onComplete, onInfo }) {
   return (
     <div
       className="flex items-center justify-between gap-3 border p-3"
@@ -39,6 +62,7 @@ function QuestRow({ name, target, stat, xp, hinweis, done, onComplete }) {
               · {target}
             </span>
           )}
+          {onInfo && <InfoKnopf onClick={onInfo} />}
         </p>
         <p style={{ ...orbitron, fontSize: '10px', color: 'var(--dim)', letterSpacing: '1px' }}>
           {stat} · +{xp} XP
@@ -86,7 +110,7 @@ function Quests() {
   const { dayType, doneToday, questProgress, drawnTask } = state
   const [stepsInput, setStepsInput] = useState('')
   const [taskInput, setTaskInput] = useState('')
-  const [beiUebungen, setBeiUebungen] = useState(false)
+  const [beiUebungen, setBeiUebungen] = useState(null)
 
   const plan = DAY_PLANS[dayType] ?? []
   const bonusPlan = BONUS_PLANS[dayType] ?? []
@@ -105,11 +129,17 @@ function Quests() {
   const test = state.rankTestActive ? RANK_TESTS[state.rank] : null
   const rankTasks = state.rankTestActive
     ? (state.rankTestTasks ??
-      buildRankTest(state.rank, state.baseTargets, needsNegatives(state)))
+      buildRankTest(state.rank, state.baseTargets))
     : null
   const rankProgress = questProgress.rankTest ?? {}
 
-  if (beiUebungen) return <Uebungen onZurueck={() => setBeiUebungen(false)} />
+  if (beiUebungen)
+    return (
+      <Uebungen
+        startUebung={typeof beiUebungen === 'string' ? beiUebungen : null}
+        onZurueck={() => setBeiUebungen(null)}
+      />
+    )
 
   return (
     <div className="flex flex-col gap-4">
@@ -145,22 +175,15 @@ function Quests() {
           </p>
           <p className="mb-3" style={{ fontSize: '13px', color: 'var(--dim)' }}>
             {rankTasks
-              .map((t) => {
-                const q = t.negativ ? QUESTS.negativklimmzuege : QUESTS[t.quest]
-                return `${t.ziel} ${q.name}`
-              })
+              .map((t) => `${t.ziel} ${resolveQuest(t.quest, state).name}`)
               .join(' + ')}{' '}
             an einem Tag
           </p>
           <div className="flex flex-col gap-2">
             {rankTasks.map((task) => {
-              const q = task.negativ
-                ? QUESTS.negativklimmzuege
-                : QUESTS[task.quest]
+              const q = resolveQuest(task.quest, state)
               const value = rankProgress[task.quest] ?? 0
-              const tagesziel = task.negativ
-                ? QUESTS.negativklimmzuege.festesZiel
-                : state.baseTargets?.[task.quest]
+              const tagesziel = state.baseTargets?.[task.quest]
               return (
                 <div
                   key={task.quest}
@@ -242,6 +265,8 @@ function Quests() {
                 target={`${q.ziel} ${q.unit}`}
                 stat={q.stat}
                 xp={q.xp}
+                hinweis={q.hinweis}
+                onInfo={() => setBeiUebungen(q.uebungId)}
                 done={doneToday.includes(q.id)}
                 onComplete={() =>
                   dispatch({
@@ -265,6 +290,7 @@ function Quests() {
                 stat={`BONUS · ${q.stat}`}
                 xp={q.xp}
                 hinweis={q.hinweis}
+                onInfo={() => setBeiUebungen(q.uebungId)}
                 done={doneToday.includes(q.id)}
                 onComplete={() =>
                   dispatch({

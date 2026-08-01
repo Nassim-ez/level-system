@@ -1,7 +1,7 @@
 import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import { RANKS, RANK_THRESHOLDS, buildRankTest, nextRank } from '../data/ranks.js'
-import { QUESTS, needsNegatives } from '../data/quests.js'
+import { resolveQuest } from '../data/quests.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -14,13 +14,10 @@ function Rang() {
   // Prüfungsziele: aktiv = eingefroren, sonst Vorschau aus aktuellen Zielen
   const tasks = next
     ? (state.rankTestActive && state.rankTestTasks) ||
-      buildRankTest(state.rank, state.baseTargets, needsNegatives(state))
+      buildRankTest(state.rank, state.baseTargets)
     : null
   const zielText = tasks
-    ?.map((t) => {
-      const q = t.negativ ? QUESTS.negativklimmzuege : QUESTS[t.quest]
-      return `${t.ziel} ${q.name}`
-    })
+    ?.map((t) => `${t.ziel} ${resolveQuest(t.quest, state).name}`)
     .join(' + ')
 
   return (
