@@ -379,7 +379,11 @@ function Uebungen({ onZurueck, startUebung = null }) {
         uebung={uebung}
         state={state}
         dispatch={dispatch}
-        onZurueck={() => setOffen(null)}
+        // Wer direkt auf einer Übung eingestiegen ist, kommt mit einem Schritt
+        // wieder dorthin zurück, statt in der Liste zu landen
+        onZurueck={() =>
+          offen === startUebung ? onZurueck() : setOffen(null)
+        }
       />
     )
   }

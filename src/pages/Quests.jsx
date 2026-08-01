@@ -10,6 +10,7 @@ import {
   STEP_XP_PER_1000,
   stepXpMax,
   resolveQuest,
+  verteileMinuten,
 } from '../data/quests.js'
 import { RANK_TESTS, buildRankTest, nextRank } from '../data/ranks.js'
 import Uebungen from './Uebungen.jsx'
@@ -41,7 +42,129 @@ function InfoKnopf({ onClick }) {
   )
 }
 
-function QuestRow({ name, target, stat, xp, hinweis, done, onComplete, onInfo }) {
+/* --------------------------------------------------------------------- */
+/* Mobility-Ablauf: eine Übung nach der anderen                           */
+/* --------------------------------------------------------------------- */
+function Ablauf({ quest, schritt, onWeiter, onAbbruch, onInfo }) {
+  const uebungen = quest.ablaufUebungen
+  const minuten = verteileMinuten(quest.ziel, uebungen.length)
+  const uebung = uebungen[schritt]
+  const letzter = schritt === uebungen.length - 1
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Panel title={quest.name.toUpperCase()}>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--xp)',
+            }}
+          >
+            {schritt + 1} VON {uebungen.length}
+          </span>
+          <button
+            type="button"
+            onClick={onAbbruch}
+            className="shrink-0 bg-transparent px-3 py-1.5"
+            style={{
+              ...orbitron,
+              fontSize: 9,
+              letterSpacing: '2px',
+              color: 'var(--dim)',
+              border: '1px solid var(--line)',
+              borderRadius: 8,
+            }}
+          >
+            ABBRECHEN
+          </button>
+        </div>
+
+        {/* Fortschritt über die fünf Schritte */}
+        <div className="mb-4 flex gap-1">
+          {uebungen.map((u, i) => (
+            <span
+              key={u.id}
+              className="h-[4px] flex-1"
+              style={{
+                borderRadius: 3,
+                background:
+                  i < schritt
+                    ? 'var(--xp)'
+                    : i === schritt
+                      ? 'var(--glow)'
+                      : 'rgba(27,58,92,.7)',
+              }}
+            />
+          ))}
+        </div>
+
+        <p className="text-[19px] font-semibold">
+          {uebung.name}
+          <InfoKnopf onClick={() => onInfo(uebung.id)} />
+        </p>
+        <p className="mt-1" style={{ ...orbitron, fontSize: 11, color: 'var(--xp)' }}>
+          {minuten[schritt]} MIN.
+        </p>
+        <p className="mt-2" style={{ fontSize: '13.5px', lineHeight: 1.55 }}>
+          {uebung.ausfuehrung[0]}
+        </p>
+        <p className="mt-2" style={{ fontSize: '12.5px', color: 'var(--dim)', lineHeight: 1.5 }}>
+          {uebung.varianten[0]?.tipp}
+        </p>
+
+        <button
+          type="button"
+          onClick={onWeiter}
+          className="mt-4 w-full bg-transparent px-4 py-2.5"
+          style={{
+            ...orbitron,
+            fontSize: '11px',
+            letterSpacing: '2px',
+            color: 'var(--glow)',
+            border: '1px solid var(--glow)',
+            borderRadius: '10px',
+          }}
+        >
+          {letzter ? 'ABLAUF ABSCHLIESSEN' : 'WEITER'}
+        </button>
+      </Panel>
+
+      <Panel title="ABLAUF">
+        <div className="flex flex-col gap-1.5">
+          {uebungen.map((u, i) => (
+            <p
+              key={u.id}
+              className="truncate"
+              style={{
+                fontSize: '12.5px',
+                color:
+                  i < schritt ? 'var(--xp)' : i === schritt ? 'var(--text)' : 'var(--dim)',
+                fontWeight: i === schritt ? 600 : 400,
+              }}
+            >
+              {i < schritt ? '◆' : '◇'} {u.name} · {minuten[i]} Min.
+            </p>
+          ))}
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
+function QuestRow({
+  name,
+  target,
+  stat,
+  xp,
+  hinweis,
+  done,
+  onComplete,
+  onInfo,
+  aktionText = 'ERLEDIGT',
+}) {
   return (
     <div
       className="flex items-center justify-between gap-3 border p-3"
@@ -98,7 +221,7 @@ function QuestRow({ name, target, stat, xp, hinweis, done, onComplete, onInfo })
             borderRadius: '8px',
           }}
         >
-          ERLEDIGT
+          {aktionText}
         </button>
       )}
     </div>
@@ -111,6 +234,7 @@ function Quests() {
   const [stepsInput, setStepsInput] = useState('')
   const [taskInput, setTaskInput] = useState('')
   const [beiUebungen, setBeiUebungen] = useState(null)
+  const [ablauf, setAblauf] = useState(null)
 
   const plan = DAY_PLANS[dayType] ?? []
   const bonusPlan = BONUS_PLANS[dayType] ?? []
@@ -133,6 +257,7 @@ function Quests() {
     : null
   const rankProgress = questProgress.rankTest ?? {}
 
+  // Die Übungsseite legt sich über alles, der Ablauf bleibt darunter offen
   if (beiUebungen)
     return (
       <Uebungen
@@ -140,6 +265,33 @@ function Quests() {
         onZurueck={() => setBeiUebungen(null)}
       />
     )
+
+  if (ablauf) {
+    const q = resolveQuest(ablauf.questId, state)
+    const letzter = ablauf.schritt >= q.ablaufUebungen.length - 1
+    return (
+      <Ablauf
+        quest={q}
+        schritt={ablauf.schritt}
+        onInfo={(uebungId) => setBeiUebungen(uebungId)}
+        onAbbruch={() => setAblauf(null)}
+        onWeiter={() => {
+          if (!letzter) {
+            setAblauf({ ...ablauf, schritt: ablauf.schritt + 1 })
+            return
+          }
+          dispatch({
+            type: 'COMPLETE_QUEST',
+            id: q.id,
+            xp: q.xp,
+            stat: q.stat,
+            name: q.name,
+          })
+          setAblauf(null)
+        }}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -266,16 +418,19 @@ function Quests() {
                 stat={q.stat}
                 xp={q.xp}
                 hinweis={q.hinweis}
-                onInfo={() => setBeiUebungen(q.uebungId)}
+                onInfo={q.uebungId ? () => setBeiUebungen(q.uebungId) : null}
                 done={doneToday.includes(q.id)}
+                aktionText={q.ablaufUebungen ? 'ABLAUF' : 'ERLEDIGT'}
                 onComplete={() =>
-                  dispatch({
-                    type: 'COMPLETE_QUEST',
-                    id: q.id,
-                    xp: q.xp,
-                    stat: q.stat,
-                    name: q.name,
-                  })
+                  q.ablaufUebungen
+                    ? setAblauf({ questId: q.id, schritt: 0 })
+                    : dispatch({
+                        type: 'COMPLETE_QUEST',
+                        id: q.id,
+                        xp: q.xp,
+                        stat: q.stat,
+                        name: q.name,
+                      })
                 }
               />
             )
@@ -290,16 +445,19 @@ function Quests() {
                 stat={`BONUS · ${q.stat}`}
                 xp={q.xp}
                 hinweis={q.hinweis}
-                onInfo={() => setBeiUebungen(q.uebungId)}
+                onInfo={q.uebungId ? () => setBeiUebungen(q.uebungId) : null}
                 done={doneToday.includes(q.id)}
+                aktionText={q.ablaufUebungen ? 'ABLAUF' : 'ERLEDIGT'}
                 onComplete={() =>
-                  dispatch({
-                    type: 'COMPLETE_QUEST',
-                    id: q.id,
-                    xp: q.xp,
-                    stat: q.stat,
-                    name: q.name,
-                  })
+                  q.ablaufUebungen
+                    ? setAblauf({ questId: q.id, schritt: 0 })
+                    : dispatch({
+                        type: 'COMPLETE_QUEST',
+                        id: q.id,
+                        xp: q.xp,
+                        stat: q.stat,
+                        name: q.name,
+                      })
                 }
               />
             )

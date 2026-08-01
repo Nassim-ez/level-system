@@ -167,9 +167,9 @@ function PopupManager() {
         })
       }
     }
-    // Beim Rangaufstieg gewechselte Übungsstufen anschließend zeigen
-    for (const w of state.stufenWechsel ?? []) {
-      add.push({ type: 'stufe', ...w })
+    // Beim Rangaufstieg gewechselte Übungsstufen in einem Popup sammeln
+    if (state.stufenWechsel?.length) {
+      add.push({ type: 'stufen', liste: state.stufenWechsel })
     }
     if (add.length > 0) setQueue((q) => [...q, ...add])
   }, [state])
@@ -177,40 +177,51 @@ function PopupManager() {
   const current = queue[0]
   if (!current) return null
   const close = () => {
-    if (current.type === 'stufe') dispatch({ type: 'CLEAR_STUFENWECHSEL' })
+    if (current.type === 'stufen') dispatch({ type: 'CLEAR_STUFENWECHSEL' })
     setQueue((q) => q.slice(1))
   }
 
-  if (current.type === 'stufe') {
+  if (current.type === 'stufen') {
+    const mehrere = current.liste.length > 1
     return (
-      <SystemPopup title="NEUE ÜBUNGSSTUFE" onClose={close}>
-        <p className="mt-2 text-[14px]" style={{ color: 'var(--dim)' }}>
-          {current.uebungName}
-        </p>
-        <div
-          className="mt-3 border px-3 py-2"
-          style={{ borderColor: 'var(--line)', borderRadius: 10 }}
-        >
-          <p style={{ fontSize: '13px', color: 'var(--dim)' }}>{current.alt}</p>
-          <p style={{ fontSize: '12px', color: 'var(--dim)' }}>↓</p>
-          <p
-            style={{
-              fontSize: '15px',
-              fontWeight: 600,
-              color: 'var(--xp)',
-            }}
-          >
-            {current.neu}
-          </p>
+      <SystemPopup
+        title={mehrere ? 'NEUE ÜBUNGSSTUFEN' : 'NEUE ÜBUNGSSTUFE'}
+        onClose={close}
+      >
+        <div className="mt-3 flex flex-col gap-2">
+          {current.liste.map((w) => (
+            <div
+              key={w.questId}
+              className="border px-3 py-2 text-left"
+              style={{ borderColor: 'var(--line)', borderRadius: 10 }}
+            >
+              <p
+                style={{
+                  fontFamily: "'Orbitron', sans-serif",
+                  fontSize: 9,
+                  letterSpacing: '1px',
+                  color: 'var(--dim)',
+                }}
+              >
+                {w.uebungName.toUpperCase()}
+              </p>
+              <p className="mt-1" style={{ fontSize: '12.5px', color: 'var(--dim)' }}>
+                {w.alt}
+              </p>
+              <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--xp)' }}>
+                ↳ {w.neu}
+              </p>
+              {w.tipp && (
+                <p className="mt-0.5" style={{ fontSize: '11.5px', color: 'var(--dim)', lineHeight: 1.45 }}>
+                  {w.tipp}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
-        {current.tipp && (
-          <p className="mt-2 text-[13px]" style={{ lineHeight: 1.5 }}>
-            {current.tipp}
-          </p>
-        )}
         <p className="mt-3" style={{ fontSize: '12px', color: 'var(--warn)', lineHeight: 1.5 }}>
-          Die schwerere Stufe erlaubt weniger Wiederholungen – dein Tagesziel
-          wurde entsprechend zurückgesetzt.
+          Die schwereren Stufen erlauben weniger Wiederholungen – deine
+          Tagesziele wurden entsprechend zurückgesetzt.
         </p>
       </SystemPopup>
     )

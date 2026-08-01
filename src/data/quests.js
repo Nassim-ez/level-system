@@ -27,7 +27,9 @@ export const QUESTS = {
   },
   dehnen: {
     id: 'dehnen',
-    uebungId: 'hueftbeuger',
+    // Kein einzelner Übungsbezug: die Quest führt durch alle Mobility-Übungen
+    ablauf: 'mobility',
+    name: 'Mobility-Ablauf',
     unit: 'Min.',
     stat: 'AGI',
     xp: 60,
@@ -48,6 +50,28 @@ export const QUESTS = {
 export function uebungZuQuest(questId) {
   const uebungId = QUESTS[questId]?.uebungId
   return uebungId ? UEBUNGEN.find((u) => u.id === uebungId) : null
+}
+
+// ---------------------------------------------------------------------------
+// Abläufe: eine Quest führt durch mehrere Übungen statt durch eine einzige
+// ---------------------------------------------------------------------------
+
+export const MOBILITY_ABLAUF = UEBUNGEN.filter((u) => u.kategorie === 'mobility')
+
+export function ablaufZuQuest(questId) {
+  return QUESTS[questId]?.ablauf === 'mobility' ? MOBILITY_ABLAUF : null
+}
+
+/**
+ * Verteilt die Minuten gleichmäßig auf die Übungen. Der Rest wandert auf
+ * die vorderen Schritte, damit die Summe genau aufgeht.
+ */
+export function verteileMinuten(gesamt, anzahl) {
+  if (anzahl <= 0) return []
+  const minuten = Math.max(anzahl, Math.round(gesamt || 0))
+  const basis = Math.floor(minuten / anzahl)
+  const rest = minuten - basis * anzahl
+  return Array.from({ length: anzahl }, (_, i) => basis + (i < rest ? 1 : 0))
 }
 
 /** Ist diese Variante beim gegebenen Rang schon freigeschaltet? */
@@ -150,6 +174,15 @@ export function raiseTargets(targets) {
 export function resolveQuest(id, state) {
   const quest = QUESTS[id]
   if (!quest) return null
+  const ablauf = ablaufZuQuest(id)
+  if (ablauf) {
+    return {
+      ...quest,
+      ablaufUebungen: ablauf,
+      hinweis: ablauf.map((u) => u.name).join(' · '),
+      ziel: state.baseTargets?.[id] ?? 0,
+    }
+  }
   const variante = aktuelleVariante(id, state)
   return {
     ...quest,
