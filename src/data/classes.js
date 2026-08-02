@@ -1,39 +1,42 @@
+// Die Klasse ergibt sich aus dem gewählten Trainingssystem und wird nur
+// noch angezeigt. Den XP-Aufschlag trägt das System, nicht die Klasse.
 export const CLASSES = {
   krieger: {
     id: 'krieger',
     name: 'Krieger',
-    stat: 'STR',
-    wert: 25,
-    beschreibung: '+25% XP auf STR-Quests',
-  },
-  tank: {
-    id: 'tank',
-    name: 'Tank',
-    stat: 'VIT',
-    wert: 25,
-    beschreibung: '+25% XP auf VIT-Quests',
+    beschreibung: 'Sucht das Gewicht, nicht die Wiederholung.',
   },
   assassine: {
     id: 'assassine',
     name: 'Assassine',
-    stat: 'AGI',
-    wert: 25,
-    beschreibung: '+25% XP auf AGI-Quests',
-  },
-  gelehrter: {
-    id: 'gelehrter',
-    name: 'Gelehrter',
-    stat: 'INT',
-    wert: 25,
-    beschreibung: '+25% XP auf INT-Quests',
+    beschreibung: 'Beherrscht den eigenen Körper in jeder Lage.',
   },
   monarch: {
     id: 'monarch',
     name: 'Monarch',
-    stat: null,
-    wert: 10,
-    beschreibung: '+10% XP auf alles',
+    beschreibung: 'Nimmt sich von jedem Weg das Beste.',
+  },
+  heiler: {
+    id: 'heiler',
+    name: 'Heiler',
+    beschreibung: 'Hält beweglich, was andere steif werden lassen.',
+  },
+  laeufer: {
+    id: 'laeufer',
+    name: 'Läufer',
+    beschreibung: 'Hört erst auf, wenn die Luft ausgeht.',
+  },
+  // Ausgelaufene Klassen der früheren Wahl – bleiben für alte Spielstände
+  tank: {
+    id: 'tank',
+    name: 'Tank',
+    beschreibung: 'Steht, wo andere weichen.',
+    veraltet: true,
+  },
+  gelehrter: {
+    id: 'gelehrter',
+    name: 'Gelehrter',
+    beschreibung: 'Plant, bevor er zuschlägt.',
+    veraltet: true,
   },
 }
-
-export const CLASS_UNLOCK_LEVEL = 5

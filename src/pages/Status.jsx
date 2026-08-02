@@ -2,6 +2,12 @@ import { useState } from 'react'
 import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import { CLASSES } from '../data/classes.js'
+import SystemKarten from '../components/SystemKarten.jsx'
+import {
+  systemOder,
+  wechselSperre,
+  WECHSEL_SPERRE_TAGE,
+} from '../data/trainingssysteme.js'
 import { TITLES } from '../data/titles.js'
 import { anrede } from '../data/gender.js'
 import { auraQuote, auraStage } from '../data/aura.js'
@@ -210,6 +216,170 @@ function Status() {
           </p>
         </div>
       </Panel>
+      <TrainingssystemPanel />
+    </div>
+  )
+}
+
+/* --------------------------------------------------------------------- */
+/* Trainingssystem: Anzeige und Wechsel                                   */
+/* --------------------------------------------------------------------- */
+function TrainingssystemPanel() {
+  const { state, dispatch } = useGame()
+  const [offen, setOffen] = useState(false)
+  const [frage, setFrage] = useState(null)
+  const system = systemOder(state.system)
+  const restTage = wechselSperre(state.systemGewechselt)
+
+  return (
+    <>
+      <Panel title="TRAININGSSYSTEM">
+        <p className="text-[16px] font-semibold" style={{ color: 'var(--glow)' }}>
+          {system.name}
+        </p>
+        <p style={{ fontSize: '12.5px', color: 'var(--dim)', lineHeight: 1.5 }}>
+          {system.beschreibung}
+        </p>
+        <p className="mt-2" style={{ fontSize: '12px' }}>
+          Klasse{' '}
+          <span style={{ color: 'var(--xp)' }}>
+            {CLASSES[system.klasse]?.name ?? system.klasse}
+          </span>{' '}
+          · +{system.bonus.wert}% XP
+          {system.bonus.kategorien.length > 0
+            ? ` auf ${system.bonus.kategorien.join(' und ')}`
+            : ' auf alles'}
+        </p>
+
+        {restTage > 0 ? (
+          <p
+            className="mt-3 border px-3 py-2"
+            style={{
+              fontSize: '12px',
+              lineHeight: 1.5,
+              color: 'var(--warn)',
+              borderColor: 'rgba(255,179,71,.4)',
+              borderRadius: 10,
+            }}
+          >
+            Gewechselt wird höchstens alle {WECHSEL_SPERRE_TAGE} Tage. Noch{' '}
+            {restTage} {restTage === 1 ? 'Tag' : 'Tage'}, dann geht es wieder.
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOffen((o) => !o)}
+            className="mt-3 w-full bg-transparent px-4 py-2.5"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--glow)',
+              border: '1px solid var(--glow)',
+              borderRadius: '10px',
+            }}
+          >
+            {offen ? 'ABBRECHEN' : 'TRAININGSSYSTEM WECHSELN'}
+          </button>
+        )}
+
+        {offen && restTage === 0 && (
+          <div className="mt-3">
+            <SystemKarten
+              aktiv={state.system}
+              knopfText="ZU DIESEM WECHSELN"
+              onWaehlen={(id) => setFrage(id)}
+            />
+          </div>
+        )}
+      </Panel>
+
+      {frage && (
+        <WechselPopup
+          zielId={frage}
+          aktuellName={system.name}
+          onAbbruch={() => setFrage(null)}
+          onBestaetigen={() => {
+            dispatch({ type: 'SWITCH_SYSTEM', id: frage })
+            setFrage(null)
+            setOffen(false)
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+function WechselPopup({ zielId, aktuellName, onAbbruch, onBestaetigen }) {
+  const ziel = systemOder(zielId)
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-6"
+      style={{ background: 'rgba(2,4,9,.7)', backdropFilter: 'blur(3px)' }}
+    >
+      <div
+        className="w-full max-w-[340px] rounded-[18px] border p-5 text-center"
+        style={{
+          background: 'var(--panel)',
+          borderColor: 'var(--glow)',
+          boxShadow: '0 0 40px rgba(63,182,255,.3)',
+        }}
+      >
+        <p style={{ ...orbitron, fontSize: '10px', letterSpacing: '3px', color: 'var(--glow)' }}>
+          ◆ SYSTEM
+        </p>
+        <p
+          className="mt-3"
+          style={{ ...orbitron, fontSize: '16px', color: 'var(--xp)' }}
+        >
+          SYSTEM WECHSELN
+        </p>
+        <p className="mt-3 text-[14px]" style={{ lineHeight: 1.55 }}>
+          {aktuellName} → <b style={{ color: 'var(--xp)' }}>{ziel.name}</b>
+        </p>
+        <p className="mt-2" style={{ fontSize: '12.5px', color: 'var(--dim)', lineHeight: 1.5 }}>
+          Level, Rang und Aura bleiben. Für neue Übungen schätzt das System
+          deine Tagesziele aus dem bisherigen Stand. Der nächste Wechsel ist
+          erst in {WECHSEL_SPERRE_TAGE} Tagen möglich.
+        </p>
+        {ziel.hinweis && (
+          <p className="mt-3" style={{ fontSize: '12px', color: 'var(--warn)', lineHeight: 1.5 }}>
+            {ziel.hinweis}
+          </p>
+        )}
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onAbbruch}
+            className="w-full bg-transparent px-4 py-2"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--dim)',
+              border: '1px solid var(--line)',
+              borderRadius: '10px',
+            }}
+          >
+            ABBRECHEN
+          </button>
+          <button
+            type="button"
+            onClick={onBestaetigen}
+            className="w-full bg-transparent px-4 py-2"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--glow)',
+              border: '1px solid var(--glow)',
+              borderRadius: '10px',
+            }}
+          >
+            WECHSELN
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

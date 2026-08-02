@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useReducer } from 'react'
 import {
   getDayType,
   requiredQuestIds,
+  ergaenzeZiele,
   todayKey,
   POOL_XP,
   raiseTargets,
@@ -13,6 +14,14 @@ import {
   EINSTIEG_ZIEL,
 } from '../data/quests.js'
 import { CLASSES } from '../data/classes.js'
+import {
+  TRAININGSSYSTEME,
+  KLASSE_ZU_SYSTEM,
+  STANDARD_SYSTEM,
+  systemOder,
+  uebungenImSystem,
+  wechselSperre,
+} from '../data/trainingssysteme.js'
 import { TITLES } from '../data/titles.js'
 import { normalizeGender } from '../data/gender.js'
 import { auraGain } from '../data/aura.js'
@@ -95,6 +104,9 @@ const initialState = {
   // an derselben Tür. Mehrere Verluste an verschiedenen Türen sind möglich.
   lostItems: [],
   klasse: null,
+  // Gewähltes Trainingssystem – bestimmt Wochenplan, Klasse und XP-Bonus
+  system: null,
+  systemGewechselt: null,
   gender: null,
   // Selbst gewählte Übungsstufen, je Quest { index, rank }
   varianten: {},
@@ -163,12 +175,16 @@ function withLog(log, text, extra = {}) {
   return [{ datum: todayKey(), text, ...extra }, ...log].slice(0, 50)
 }
 
-// XP-Bonus kommt seit dem Katalog bis C-Rang nur noch von der Klasse;
-// die Ausrüstung wirkt im Kampf statt auf die XP.
-function xpMultiplier(state, stat) {
-  const klasse = state.klasse ? CLASSES[state.klasse] : null
-  const pct = klasse && (!klasse.stat || klasse.stat === stat) ? klasse.wert : 0
-  return 1 + pct / 100
+// Der XP-Aufschlag haengt am Trainingssystem und gilt fuer die Kategorien,
+// auf die es sich konzentriert. Eine leere Liste heisst: auf alles.
+function xpMultiplier(state, kategorie) {
+  if (!state.system) return 1
+  const bonus = systemOder(state.system).bonus
+  if (!bonus) return 1
+  const trifft =
+    bonus.kategorien.length === 0 ||
+    (kategorie && bonus.kategorien.includes(kategorie))
+  return trifft ? 1 + bonus.wert / 100 : 1
 }
 
 function unlockTitles(state) {
@@ -200,7 +216,7 @@ function reducer(state, action) {
       let log = state.log
       let amount = action.amount
       if (amount > 0) {
-        amount = Math.round(amount * xpMultiplier(state, action.stat))
+        amount = Math.round(amount * xpMultiplier(state, action.kategorie))
       }
       xp += amount
       let auraGewinn = 0
@@ -261,7 +277,7 @@ function reducer(state, action) {
       let inventory = state.inventory
       let log = state.log
       if (state.lastDay) {
-        const required = requiredQuestIds(state.dayType)
+        const required = requiredQuestIds(state.system, state.dayType)
         const allDone =
           required.every((id) => state.doneToday.includes(id)) &&
           (state.questProgress.steps ?? 0) > 0
@@ -324,7 +340,7 @@ function reducer(state, action) {
     }
     case 'COMPLETE_QUEST': {
       if (state.doneToday.includes(action.id)) return state
-      const awarded = Math.round(action.xp * xpMultiplier(state, action.stat))
+      const awarded = Math.round(action.xp * xpMultiplier(state, action.kategorie))
       let next = {
         ...state,
         log: withLog(state.log, `${action.name ?? action.id} erledigt`, {
@@ -336,6 +352,7 @@ function reducer(state, action) {
         type: 'ADD_XP',
         amount: action.xp,
         stat: action.stat,
+        kategorie: action.kategorie,
       })
       if (action.poolId != null) {
         next = {
@@ -400,11 +417,20 @@ function reducer(state, action) {
         name: action.name?.trim() || state.name,
         gender: normalizeGender(action.gender ?? state.gender),
         rank: action.rank,
-        baseTargets: action.baseTargets ?? state.baseTargets,
+        system: action.system ?? STANDARD_SYSTEM,
+        klasse: systemOder(action.system).klasse,
+        baseTargets: ergaenzeZiele(
+          action.baseTargets ?? state.baseTargets,
+          uebungenImSystem(action.system),
+        ),
         // Wer eine Übung noch gar nicht schafft, startet auf der untersten
         // Sprosse der Leiter statt bei der Variante seines Rangs
         varianten: action.maxima
-          ? startVarianten(action.maxima, action.rank)
+          ? startVarianten(
+              action.maxima,
+              action.rank,
+              uebungenImSystem(action.system),
+            )
           : state.varianten,
         level,
         xp: 0,
@@ -857,13 +883,47 @@ function reducer(state, action) {
       if (!['m', 'w'].includes(action.gender)) return state
       return { ...state, gender: action.gender }
     }
-    case 'CHOOSE_CLASS': {
-      if (state.klasse || !CLASSES[action.id]) return state
+    case 'CHOOSE_SYSTEM': {
+      // Erstwahl im Onboarding: Klasse und Tagesziele folgen dem System
+      const system = TRAININGSSYSTEME[action.id]
+      if (!system) return state
+      const baseTargets = ergaenzeZiele(
+        state.baseTargets,
+        uebungenImSystem(system.id),
+      )
       return {
         ...state,
-        klasse: action.id,
-        log: withLog(state.log, `Klasse ${CLASSES[action.id].name} gewählt`, {
-          detail: 'Die Wahl ist endgültig',
+        system: system.id,
+        klasse: system.klasse,
+        baseTargets,
+        log: withLog(state.log, `Trainingssystem ${system.name}`, {
+          detail: `Klasse ${CLASSES[system.klasse]?.name ?? system.klasse}`,
+        }),
+      }
+    }
+    case 'SWITCH_SYSTEM': {
+      const system = TRAININGSSYSTEME[action.id]
+      if (!system || system.id === state.system) return state
+      // Höchstens ein Wechsel pro Woche
+      if (wechselSperre(state.systemGewechselt) > 0) return state
+      const alt = systemOder(state.system)
+      // Für Übungen, die es bisher nicht gab, Ziele aus dem Bestand schätzen
+      const baseTargets = ergaenzeZiele(
+        state.baseTargets,
+        uebungenImSystem(system.id),
+      )
+      return {
+        ...state,
+        system: system.id,
+        klasse: system.klasse,
+        systemGewechselt: todayKey(),
+        baseTargets,
+        // Der neue Plan bringt eigene Übungen mit; eigene Stufenwahl
+        // und Tagesfortschritt beginnen von vorn
+        varianten: {},
+        doneToday: [],
+        log: withLog(state.log, `Trainingssystem gewechselt`, {
+          detail: `${alt.name} → ${system.name} · Klasse ${CLASSES[system.klasse]?.name ?? system.klasse}`,
         }),
       }
     }
@@ -931,7 +991,11 @@ function reducer(state, action) {
 
       // Mit dem neuen Rang rücken Übungen eine Sprosse hoch. Die eigene
       // Variantenwahl gilt nur bis zum Rangwechsel und fällt hier weg.
-      const wechsel = variantenWechsel(state, { ...state, rank: newRank, varianten: {} })
+      const wechsel = variantenWechsel(
+        state,
+        { ...state, rank: newRank, varianten: {} },
+        uebungenImSystem(state.system),
+      )
       for (const w of wechsel) {
         // Die schwerere Variante erlaubt weniger Wiederholungen
         baseTargets = {
@@ -1036,6 +1100,12 @@ function migriereSpielstand(gespeichert) {
   const baseTargets = { ...initialState.baseTargets, ...gespeichert.baseTargets }
   // Ohne Klimmzug-Ziel lief früher der Negativ-Ersatz mit festem Ziel
   if (!baseTargets.klimmzuege) baseTargets.klimmzuege = EINSTIEG_ZIEL
+  // Früher wurde eine Klasse gewählt; daraus wird das passende System
+  const system =
+    gespeichert.system ??
+    (gespeichert.klasse ? KLASSE_ZU_SYSTEM[gespeichert.klasse] : null) ??
+    (gespeichert.onboarded ? STANDARD_SYSTEM : null)
+  const klasse = system ? systemOder(system).klasse : gespeichert.klasse
   return {
     ...gespeichert,
     inventory,
@@ -1045,7 +1115,11 @@ function migriereSpielstand(gespeichert) {
     materials,
     doneToday,
     rankTestTasks,
-    baseTargets,
+    // Übungen des Systems brauchen ein Tagesziel, auch wenn sie neu sind
+    baseTargets: system ? ergaenzeZiele(baseTargets, uebungenImSystem(system)) : baseTargets,
+    system,
+    klasse,
+    systemGewechselt: gespeichert.systemGewechselt ?? null,
     varianten: gespeichert.varianten ?? {},
     stufenWechsel: gespeichert.stufenWechsel ?? [],
     gender: normalizeGender(gespeichert.gender),
@@ -1156,9 +1230,9 @@ export function GameProvider({ children }) {
     if (!state.onboarded) return
     const today = todayKey()
     if (state.lastDay !== today) {
-      dispatch({ type: 'NEW_DAY', today, dayType: getDayType() })
+      dispatch({ type: 'NEW_DAY', today, dayType: getDayType(state.system) })
     }
-  }, [state.lastDay, state.onboarded])
+  }, [state.lastDay, state.onboarded, state.system])
 
   return (
     <GameContext.Provider value={{ state, dispatch }}>

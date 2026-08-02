@@ -1,47 +1,48 @@
-import { UEBUNGEN } from './uebungen.js'
+import { UEBUNGEN, KATEGORIE_NAMEN } from './uebungen.js'
 import { RANKS } from './ranks.js'
+import { systemOder, tagesplan, tagestyp } from './trainingssysteme.js'
 
 // Jede Trainings-Quest zeigt auf eine Übung der Datenbank. Wie sie heißt,
 // entscheidet die Variante – die hängt am Rang oder an der eigenen Wahl.
-export const QUESTS = {
-  liegestuetze: {
-    id: 'liegestuetze',
-    uebungId: 'liegestuetze',
-    unit: 'Wdh.',
-    stat: 'STR',
-    xp: 60,
-  },
-  kniebeugen: {
-    id: 'kniebeugen',
-    uebungId: 'kniebeugen',
-    unit: 'Wdh.',
-    stat: 'STR',
-    xp: 60,
-  },
-  crunches: {
-    id: 'crunches',
-    uebungId: 'crunches',
-    unit: 'Wdh.',
-    stat: 'VIT',
-    xp: 60,
-  },
-  dehnen: {
+// Welche Quests an einem Tag anstehen, bestimmt das Trainingssystem.
+export const QUEST_XP = 60
+
+// Kategorie → Attribut, auf das die Übung einzahlt
+export const KATEGORIE_STAT = {
+  kraft: 'STR',
+  core: 'VIT',
+  ausdauer: 'VIT',
+  tempo: 'AGI',
+  mobility: 'AGI',
+}
+
+function baueQuests() {
+  const quests = {}
+  for (const uebung of UEBUNGEN) {
+    quests[uebung.id] = {
+      id: uebung.id,
+      uebungId: uebung.id,
+      kategorie: uebung.kategorie,
+      unit: uebung.kategorie === 'mobility' ? 'Min.' : 'Wdh.',
+      stat: KATEGORIE_STAT[uebung.kategorie] ?? 'STR',
+      xp: QUEST_XP,
+    }
+  }
+  // Dehnen ist keine einzelne Übung, sondern der Ablauf durch alle
+  // Mobility-Übungen
+  quests.dehnen = {
     id: 'dehnen',
-    // Kein einzelner Übungsbezug: die Quest führt durch alle Mobility-Übungen
     ablauf: 'mobility',
     name: 'Mobility-Ablauf',
+    kategorie: 'mobility',
     unit: 'Min.',
     stat: 'AGI',
-    xp: 60,
-  },
-  klimmzuege: {
-    id: 'klimmzuege',
-    uebungId: 'klimmzuege',
-    unit: 'Wdh.',
-    stat: 'STR',
-    xp: 60,
-  },
+    xp: QUEST_XP,
+  }
+  return quests
 }
+
+export const QUESTS = baueQuests()
 
 // ---------------------------------------------------------------------------
 // Varianten: welche Stufe der Leiter gilt gerade?
@@ -109,18 +110,9 @@ export function aktuelleVariante(questId, state) {
   return { ...uebung.varianten[index], index, uebung }
 }
 
-export const DAY_PLANS = {
-  A: ['liegestuetze', 'kniebeugen'],
-  B: ['crunches', 'dehnen'],
-  REST: [],
-}
-
-// Optionale Bonus-Quests je Tagestyp (zählen nicht zur Serien-Pflicht)
-export const BONUS_PLANS = {
-  A: ['klimmzuege'],
-  B: [],
-  REST: [],
-}
+// Der Tagesplan kommt aus dem Trainingssystem, siehe tagesplan().
+// Bonus-Quests gibt es keine mehr – die Systeme bringen ihre eigenen
+// Übungspaare mit, ein zusätzlicher Anhang würde sie nur verwässern.
 
 // Startwerte der Tagesziele aus den Onboarding-Maximalwerten
 export const TARGET_FACTOR = 1.5 // Muskelübungen: etwas über dem Maximum
@@ -147,9 +139,9 @@ export function targetsFromMaxima(maxima) {
  * Rudern statt an der Stange. Das ersetzt die frühere Sonderregel für
  * Negativ-Klimmzüge.
  */
-export function startVarianten(maxima, rank) {
+export function startVarianten(maxima, rank, questIds = Object.keys(QUESTS)) {
   const wahl = {}
-  for (const questId of Object.keys(QUESTS)) {
+  for (const questId of questIds) {
     const uebung = uebungZuQuest(questId)
     if (!uebung) continue
     if ((maxima?.[questId] ?? 0) > 0) continue
@@ -198,9 +190,9 @@ export function resolveQuest(id, state) {
  * Liefert je Quest den Wechsel, damit die App ihn zeigen und das
  * Tagesziel anpassen kann.
  */
-export function variantenWechsel(vorher, nachher) {
+export function variantenWechsel(vorher, nachher, questIds = Object.keys(QUESTS)) {
   const wechsel = []
-  for (const questId of Object.keys(QUESTS)) {
+  for (const questId of questIds) {
     const alt = aktuelleVariante(questId, vorher)
     const neu = aktuelleVariante(questId, nachher)
     if (!alt || !neu || alt.index === neu.index) continue
@@ -219,10 +211,19 @@ export function variantenWechsel(vorher, nachher) {
 // Anteil, auf den das Tagesziel bei einer schwereren Variante fällt
 export const STUFENWECHSEL_ANTEIL = 0.6
 
-export const DAY_LABELS = {
-  A: 'TAG A · KRAFT',
-  B: 'TAG B · CORE & MOBILITÄT',
-  REST: 'RUHETAG · REGENERATION',
+// Überschrift des Tages: Systemname plus Schwerpunkt der anstehenden Übungen
+export function tagesLabel(systemId, dayType) {
+  if (dayType === 'REST') return 'RUHETAG · REGENERATION'
+  const system = systemOder(systemId)
+  const kategorien = [
+    ...new Set(
+      tagesplan(systemId, dayType)
+        .map((id) => QUESTS[id]?.kategorie)
+        .filter(Boolean),
+    ),
+  ]
+  const namen = kategorien.map((k) => KATEGORIE_NAMEN[k] ?? k).join(' & ')
+  return `TAG ${dayType} · ${namen.toUpperCase() || system.name.toUpperCase()}`
 }
 
 export const TABLETS_XP = 20
@@ -230,18 +231,54 @@ export const POOL_XP = 30
 export const STEP_XP_PER_1000 = 10
 export const STEP_XP_MAX = 60
 
-export function getDayType(date = new Date()) {
-  const day = date.getDay()
-  if (day === 0) return 'REST'
-  return day === 1 || day === 3 || day === 5 ? 'A' : 'B'
+export function getDayType(systemId, date = new Date()) {
+  return tagestyp(systemId, date)
 }
 
 export function stepXpMax(dayType) {
   return dayType === 'REST' ? STEP_XP_MAX / 2 : STEP_XP_MAX
 }
 
-export function requiredQuestIds(dayType) {
-  return [...(DAY_PLANS[dayType] ?? []), 'tabletten']
+// Tabletten sind in jedem System Pflicht, dazu die Übungen des Tages
+export function requiredQuestIds(systemId, dayType) {
+  return [...tagesplan(systemId, dayType), 'tabletten']
+}
+
+/**
+ * Schätzt Tagesziele für Übungen, die es im alten System nicht gab.
+ * Grundlage sind die vorhandenen Ziele derselben Kategorie, umgerechnet
+ * über das Verhältnis der Grundschwierigkeiten – eine schwerere Übung
+ * bekommt entsprechend weniger Wiederholungen.
+ */
+export function ergaenzeZiele(baseTargets, questIds) {
+  const ziele = { ...baseTargets }
+  // Maßstab ist immer der mitgebrachte Bestand. Würden geschätzte Werte
+  // selbst wieder als Grundlage dienen, schaukelt sich der Fehler auf.
+  const bestand = Object.entries(baseTargets ?? {})
+    .map(([id, wert]) => ({ id, wert, uebung: uebungZuQuest(id) }))
+    .filter((e) => e.wert > 0 && e.uebung)
+
+  const schaetze = (uebung, referenz) => {
+    if (referenz.length === 0) return EINSTIEG_ZIEL
+    const schnitt = referenz.reduce((s, e) => s + e.wert, 0) / referenz.length
+    const stufenSchnitt =
+      referenz.reduce((s, e) => s + (e.uebung.stufe || 2), 0) / referenz.length
+    // Schwerere Übung, weniger Wiederholungen – und umgekehrt
+    return Math.max(1, Math.round((schnitt * stufenSchnitt) / (uebung.stufe || 1)))
+  }
+
+  for (const questId of questIds) {
+    if (ziele[questId] > 0) continue
+    const uebung = uebungZuQuest(questId)
+    if (!uebung) {
+      ziele[questId] = EINSTIEG_ZIEL
+      continue
+    }
+    // Zuerst dieselbe Kategorie, sonst der gesamte Bestand
+    const gleicheArt = bestand.filter((e) => e.uebung.kategorie === uebung.kategorie)
+    ziele[questId] = schaetze(uebung, gleicheArt.length > 0 ? gleicheArt : bestand)
+  }
+  return ziele
 }
 
 // Referenzwerte für die Rang-Einstufung: Schwellen je Stufe 0–3

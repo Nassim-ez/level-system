@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from './context/GameContext.jsx'
-import { CLASSES, CLASS_UNLOCK_LEVEL } from './data/classes.js'
 import { TITLES } from './data/titles.js'
 import Onboarding from './pages/Onboarding.jsx'
 import Status from './pages/Status.jsx'
@@ -280,107 +279,6 @@ function PopupManager() {
   )
 }
 
-function ClassChoicePopup() {
-  const { state, dispatch } = useGame()
-  const [hidden, setHidden] = useState(false)
-
-  if (hidden || state.klasse || state.level < CLASS_UNLOCK_LEVEL) return null
-  return (
-    <div
-      className="fixed inset-0 z-50 overflow-y-auto px-6 py-8"
-      style={{ background: 'rgba(2,4,9,.85)', backdropFilter: 'blur(4px)' }}
-    >
-      <div className="mx-auto w-full max-w-[360px]">
-        <p
-          className="text-center"
-          style={{
-            fontFamily: "'Orbitron', sans-serif",
-            fontSize: '10px',
-            letterSpacing: '3px',
-            color: 'var(--glow)',
-          }}
-        >
-          ◆ SYSTEM
-        </p>
-        <p
-          className="mt-2 text-center"
-          style={{
-            fontFamily: "'Orbitron', sans-serif",
-            fontSize: '20px',
-            color: 'var(--xp)',
-            textShadow: '0 0 14px rgba(143,224,255,.9)',
-          }}
-        >
-          KLASSENWAHL
-        </p>
-        <p className="mt-1 text-center text-[14px]">Wähle deinen Pfad</p>
-        <p
-          className="mt-1 text-center"
-          style={{ fontSize: '12px', color: 'var(--danger)' }}
-        >
-          Die Wahl ist endgültig und kann nicht geändert werden.
-        </p>
-        <div className="mt-5 flex flex-col gap-3">
-          {Object.values(CLASSES).map((klasse) => (
-            <div
-              key={klasse.id}
-              className="flex items-center justify-between gap-3 rounded-[14px] border p-4"
-              style={{
-                background: 'var(--panel)',
-                borderColor: 'var(--line)',
-                boxShadow: '0 0 14px rgba(63,182,255,.12)',
-              }}
-            >
-              <div>
-                <p
-                  style={{
-                    fontFamily: "'Orbitron', sans-serif",
-                    fontSize: '14px',
-                    letterSpacing: '1px',
-                  }}
-                >
-                  {klasse.name}
-                </p>
-                <p style={{ fontSize: '12px', color: 'var(--dim)' }}>
-                  {klasse.beschreibung}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: 'CHOOSE_CLASS', id: klasse.id })}
-                className="shrink-0 bg-transparent px-3 py-1.5"
-                style={{
-                  fontFamily: "'Orbitron', sans-serif",
-                  fontSize: '10px',
-                  letterSpacing: '2px',
-                  color: 'var(--glow)',
-                  border: '1px solid var(--glow)',
-                  borderRadius: '8px',
-                }}
-              >
-                WÄHLEN
-              </button>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => setHidden(true)}
-          className="mx-auto mt-4 block bg-transparent px-4 py-2"
-          style={{
-            fontFamily: "'Orbitron', sans-serif",
-            fontSize: '10px',
-            letterSpacing: '2px',
-            color: 'var(--dim)',
-            border: 'none',
-          }}
-        >
-          SPÄTER ENTSCHEIDEN
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function App() {
   const { state } = useGame()
@@ -396,7 +294,6 @@ function App() {
   return (
     <>
       <PopupManager />
-      <ClassChoicePopup />
       <main className="px-4 pb-24 pt-6">
         <ActivePage />
       </main>

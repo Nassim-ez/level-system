@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useGame } from '../context/GameContext.jsx'
 import { GENDERS, anrede } from '../data/gender.js'
+import SystemKarten from '../components/SystemKarten.jsx'
+import { CLASSES } from '../data/classes.js'
+import { TRAININGSSYSTEME } from '../data/trainingssysteme.js'
 import {
   QUESTS,
   rankFromMaxima,
@@ -52,13 +55,16 @@ function Onboarding() {
   const [name, setName] = useState('')
   const [gender, setGender] = useState(null)
   const [maxima, setMaxima] = useState({})
+  const [system, setSystem] = useState(null)
   const [entry, setEntry] = useState('')
 
   const rank = rankFromMaxima(maxima)
   const baseTargets = targetsFromMaxima(maxima)
+  const gewaehltesSystem = system ? TRAININGSSYSTEME[system] : null
   const firstQuestion = 2
   const summaryStep = QUESTIONS.length + firstQuestion
-  const resultStep = summaryStep + 1
+  const systemStep = summaryStep + 1
+  const resultStep = systemStep + 1
 
   const currentQuestion = QUESTIONS[step - firstQuestion]
   const submitValue = (value) => {
@@ -318,7 +324,7 @@ function Onboarding() {
           )}
           <button
             type="button"
-            onClick={() => setStep(resultStep)}
+            onClick={() => setStep(systemStep)}
             className="mt-5 bg-transparent px-6 py-2.5"
             style={{
               ...orbitron,
@@ -331,6 +337,36 @@ function Onboarding() {
           >
             WEITER
           </button>
+        </div>
+      )}
+
+      {step === systemStep && (
+        <div className="mt-4 w-full max-w-[360px]">
+          <p
+            className="text-center"
+            style={{
+              ...orbitron,
+              fontSize: '16px',
+              color: 'var(--xp)',
+              textShadow: '0 0 14px rgba(143,224,255,.9)',
+            }}
+          >
+            TRAININGSSYSTEM
+          </p>
+          <p className="mt-2 text-center" style={{ fontSize: '13px', color: 'var(--dim)' }}>
+            Es bestimmt deinen Wochenplan und deine Klasse. Du kannst später
+            wechseln, aber höchstens einmal pro Woche.
+          </p>
+          <div className="mt-4">
+            <SystemKarten
+              aktiv={system}
+              knopfText="DIESES SYSTEM"
+              onWaehlen={(id) => {
+                setSystem(id)
+                setStep(resultStep)
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -371,6 +407,31 @@ function Onboarding() {
           >
             RANG {rank}
           </p>
+          {gewaehltesSystem && (
+            <>
+              <p className="mt-3 text-[14px]">
+                {gewaehltesSystem.name} ·{' '}
+                <span style={{ color: 'var(--xp)' }}>
+                  Klasse {CLASSES[gewaehltesSystem.klasse]?.name}
+                </span>
+              </p>
+              {gewaehltesSystem.hinweis && (
+                <p
+                  className="mt-3 border px-3 py-2 text-left"
+                  style={{
+                    fontSize: '12px',
+                    lineHeight: 1.5,
+                    color: 'var(--warn)',
+                    borderColor: 'rgba(255,179,71,.45)',
+                    borderRadius: 10,
+                  }}
+                >
+                  {gewaehltesSystem.hinweis} Wir setzen dir dafür bewusst keine
+                  Kalorienziele und versprechen dir kein Gewicht.
+                </p>
+              )}
+            </>
+          )}
           <button
             type="button"
             onClick={() =>
@@ -381,6 +442,7 @@ function Onboarding() {
                 rank,
                 baseTargets,
                 maxima,
+                system,
               })
             }
             className="mt-6 bg-transparent px-6 py-3"

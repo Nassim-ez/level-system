@@ -2,9 +2,7 @@ import { useState } from 'react'
 import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import {
-  DAY_PLANS,
-  BONUS_PLANS,
-  DAY_LABELS,
+  tagesLabel,
   TABLETS_XP,
   POOL_XP,
   STEP_XP_PER_1000,
@@ -12,6 +10,7 @@ import {
   resolveQuest,
   verteileMinuten,
 } from '../data/quests.js'
+import { tagesplan } from '../data/trainingssysteme.js'
 import { RANK_TESTS, buildRankTest, nextRank } from '../data/ranks.js'
 import Uebungen from './Uebungen.jsx'
 
@@ -236,8 +235,7 @@ function Quests() {
   const [beiUebungen, setBeiUebungen] = useState(null)
   const [ablauf, setAblauf] = useState(null)
 
-  const plan = DAY_PLANS[dayType] ?? []
-  const bonusPlan = BONUS_PLANS[dayType] ?? []
+  const plan = tagesplan(state.system, dayType)
   const cap = stepXpMax(dayType)
   const stepsXp = questProgress.stepsXp ?? 0
   const loggedSteps = questProgress.steps ?? 0
@@ -285,6 +283,7 @@ function Quests() {
             id: q.id,
             xp: q.xp,
             stat: q.stat,
+            kategorie: q.kategorie,
             name: q.name,
           })
           setAblauf(null)
@@ -399,7 +398,7 @@ function Quests() {
           className="mb-3"
           style={{ ...orbitron, fontSize: '11px', color: 'var(--xp)', letterSpacing: '2px' }}
         >
-          {DAY_LABELS[dayType]}
+          {tagesLabel(state.system, dayType)}
         </p>
         {dayType === 'REST' && (
           <p className="mb-3" style={{ fontSize: '13px', color: 'var(--dim)' }}>
@@ -429,33 +428,7 @@ function Quests() {
                         id: q.id,
                         xp: q.xp,
                         stat: q.stat,
-                        name: q.name,
-                      })
-                }
-              />
-            )
-          })}
-          {bonusPlan.map((id) => {
-            const q = resolveQuest(id, state)
-            return (
-              <QuestRow
-                key={q.id}
-                name={q.name}
-                target={`${q.ziel} ${q.unit}`}
-                stat={`BONUS · ${q.stat}`}
-                xp={q.xp}
-                hinweis={q.hinweis}
-                onInfo={q.uebungId ? () => setBeiUebungen(q.uebungId) : null}
-                done={doneToday.includes(q.id)}
-                aktionText={q.ablaufUebungen ? 'ABLAUF' : 'ERLEDIGT'}
-                onComplete={() =>
-                  q.ablaufUebungen
-                    ? setAblauf({ questId: q.id, schritt: 0 })
-                    : dispatch({
-                        type: 'COMPLETE_QUEST',
-                        id: q.id,
-                        xp: q.xp,
-                        stat: q.stat,
+                        kategorie: q.kategorie,
                         name: q.name,
                       })
                 }
