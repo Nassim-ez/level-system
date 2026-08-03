@@ -16,14 +16,34 @@ export const KATEGORIE_STAT = {
   mobility: 'AGI',
 }
 
+// Anzeigetext der Einheiten
+export const EINHEIT_LABEL = { wdh: 'Wdh.', sek: 'Sek', min: 'Min.' }
+
+// Sekundenziele laufen in Viertelminuten – der Knopf und die Rundung
+export const SEKUNDEN_SCHRITT = 15
+// Richtwert für die Umrechnung alter Wiederholungsziele
+export const SEKUNDEN_JE_WDH = 2
+// Startwert, wenn gar kein Vergleich möglich ist
+export const SEKUNDEN_START = 60
+
+/** Rundet Sekunden auf den nächsten sinnvollen Schritt, mindestens einen */
+export function rundeSekunden(wert) {
+  return Math.max(
+    SEKUNDEN_SCHRITT,
+    Math.round(wert / SEKUNDEN_SCHRITT) * SEKUNDEN_SCHRITT,
+  )
+}
+
 function baueQuests() {
   const quests = {}
   for (const uebung of UEBUNGEN) {
+    const einheit = uebung.einheit ?? 'wdh'
     quests[uebung.id] = {
       id: uebung.id,
       uebungId: uebung.id,
       kategorie: uebung.kategorie,
-      unit: uebung.kategorie === 'mobility' ? 'Min.' : 'Wdh.',
+      einheit,
+      unit: EINHEIT_LABEL[einheit] ?? 'Wdh.',
       stat: KATEGORIE_STAT[uebung.kategorie] ?? 'STR',
       xp: QUEST_XP,
     }
@@ -35,6 +55,7 @@ function baueQuests() {
     ablauf: 'mobility',
     name: 'Mobility-Ablauf',
     kategorie: 'mobility',
+    einheit: 'min',
     unit: 'Min.',
     stat: 'AGI',
     xp: QUEST_XP,
@@ -47,6 +68,10 @@ export const QUESTS = baueQuests()
 // ---------------------------------------------------------------------------
 // Varianten: welche Stufe der Leiter gilt gerade?
 // ---------------------------------------------------------------------------
+
+export function einheitVon(questId) {
+  return QUESTS[questId]?.einheit ?? 'wdh'
+}
 
 export function uebungZuQuest(questId) {
   const uebungId = QUESTS[questId]?.uebungId
@@ -156,7 +181,14 @@ export function startVarianten(maxima, rank, questIds = Object.keys(QUESTS)) {
 export function raiseTargets(targets) {
   const raised = {}
   for (const [key, value] of Object.entries(targets)) {
-    raised[key] = Math.ceil(value * RANK_UP_FACTOR)
+    const angehoben = value * RANK_UP_FACTOR
+    // Sekundenziele bleiben auf dem Viertelminuten-Raster. Ohne die
+    // Untergrenze würde das Runden kleine Ziele auf der Stelle treten
+    // lassen: 45 × 1,15 sind 51,75 und damit gerundet wieder 45.
+    raised[key] =
+      einheitVon(key) === 'sek'
+        ? Math.max(rundeSekunden(angehoben), value + SEKUNDEN_SCHRITT)
+        : Math.ceil(angehoben)
   }
   return raised
 }
@@ -255,30 +287,63 @@ export function ergaenzeZiele(baseTargets, questIds) {
   // Maßstab ist immer der mitgebrachte Bestand. Würden geschätzte Werte
   // selbst wieder als Grundlage dienen, schaukelt sich der Fehler auf.
   const bestand = Object.entries(baseTargets ?? {})
-    .map(([id, wert]) => ({ id, wert, uebung: uebungZuQuest(id) }))
+    .map(([id, wert]) => ({
+      id,
+      wert,
+      uebung: uebungZuQuest(id),
+      einheit: einheitVon(id),
+    }))
     .filter((e) => e.wert > 0 && e.uebung)
 
-  const schaetze = (uebung, referenz) => {
-    if (referenz.length === 0) return EINSTIEG_ZIEL
+  const schaetze = (uebung, einheit, referenz) => {
+    if (referenz.length === 0) {
+      return einheit === 'sek' ? SEKUNDEN_START : EINSTIEG_ZIEL
+    }
     const schnitt = referenz.reduce((s, e) => s + e.wert, 0) / referenz.length
     const stufenSchnitt =
       referenz.reduce((s, e) => s + (e.uebung.stufe || 2), 0) / referenz.length
     // Schwerere Übung, weniger Wiederholungen – und umgekehrt
-    return Math.max(1, Math.round((schnitt * stufenSchnitt) / (uebung.stufe || 1)))
+    const wert = (schnitt * stufenSchnitt) / (uebung.stufe || 1)
+    return einheit === 'sek' ? rundeSekunden(wert) : Math.max(1, Math.round(wert))
   }
 
   for (const questId of questIds) {
     if (ziele[questId] > 0) continue
     const uebung = uebungZuQuest(questId)
+    const einheit = einheitVon(questId)
     if (!uebung) {
       ziele[questId] = EINSTIEG_ZIEL
       continue
     }
-    // Zuerst dieselbe Kategorie, sonst der gesamte Bestand
-    const gleicheArt = bestand.filter((e) => e.uebung.kategorie === uebung.kategorie)
-    ziele[questId] = schaetze(uebung, gleicheArt.length > 0 ? gleicheArt : bestand)
+    // Sekunden- und Wiederholungsziele sind nicht vergleichbar und dürfen
+    // sich beim Schätzen nicht vermischen
+    const passende = bestand.filter((e) => e.einheit === einheit)
+    const gleicheArt = passende.filter((e) => e.uebung.kategorie === uebung.kategorie)
+    const referenz = gleicheArt.length > 0 ? gleicheArt : passende
+    // Ohne Vergleichswert in derselben Einheit: aus Wiederholungen umrechnen
+    if (referenz.length === 0 && einheit === 'sek') {
+      const ausWdh = bestand.filter((e) => e.einheit === 'wdh')
+      if (ausWdh.length > 0) {
+        const schnitt = ausWdh.reduce((s, e) => s + e.wert, 0) / ausWdh.length
+        const stufenSchnitt =
+          ausWdh.reduce((s, e) => s + (e.uebung.stufe || 2), 0) / ausWdh.length
+        ziele[questId] = rundeSekunden(
+          ((schnitt * stufenSchnitt) / (uebung.stufe || 1)) * SEKUNDEN_JE_WDH,
+        )
+        continue
+      }
+    }
+    ziele[questId] = schaetze(uebung, einheit, referenz)
   }
   return ziele
+}
+
+/**
+ * Rechnet Wiederholungsziele einer Übung, die jetzt auf Zeit läuft, in
+ * Sekunden um. Zwei Sekunden je Wiederholung, dann auf volle Viertelminuten.
+ */
+export function inSekunden(wiederholungen) {
+  return rundeSekunden((wiederholungen || 0) * SEKUNDEN_JE_WDH)
 }
 
 // Referenzwerte für die Rang-Einstufung: Schwellen je Stufe 0–3

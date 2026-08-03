@@ -3,6 +3,8 @@ import {
   getDayType,
   requiredQuestIds,
   ergaenzeZiele,
+  einheitVon,
+  inSekunden,
   todayKey,
   POOL_XP,
   raiseTargets,
@@ -337,6 +339,32 @@ function reducer(state, action) {
         drawnTask,
         daily,
       }
+    }
+    case 'LOG_ZEIT': {
+      // Sekundenübungen zählen hoch, bis das Tagesziel steht
+      if (state.doneToday.includes(action.id)) return state
+      const ziel = state.baseTargets?.[action.id] ?? 0
+      const bisher = state.questProgress?.zeit?.[action.id] ?? 0
+      const stand = Math.min(ziel, bisher + (action.sekunden ?? 0))
+      const next = {
+        ...state,
+        questProgress: {
+          ...state.questProgress,
+          zeit: { ...(state.questProgress?.zeit ?? {}), [action.id]: stand },
+        },
+      }
+      // Ziel erreicht: die Quest wird ganz normal abgeschlossen
+      if (stand >= ziel && ziel > 0) {
+        return reducer(next, {
+          type: 'COMPLETE_QUEST',
+          id: action.id,
+          xp: action.xp,
+          stat: action.stat,
+          kategorie: action.kategorie,
+          name: action.name,
+        })
+      }
+      return next
     }
     case 'COMPLETE_QUEST': {
       if (state.doneToday.includes(action.id)) return state
@@ -1100,6 +1128,15 @@ function migriereSpielstand(gespeichert) {
   const baseTargets = { ...initialState.baseTargets, ...gespeichert.baseTargets }
   // Ohne Klimmzug-Ziel lief früher der Negativ-Ersatz mit festem Ziel
   if (!baseTargets.klimmzuege) baseTargets.klimmzuege = EINSTIEG_ZIEL
+  // Ausdauerübungen laufen jetzt auf Zeit. Alte Wiederholungsziele werden
+  // mit dem Richtwert umgerechnet; schon umgestellte Werte liegen bereits
+  // auf dem Viertelminuten-Raster und bleiben unberührt.
+  const zeitUmgestellt = gespeichert.zeitUmgestellt === true
+  if (!zeitUmgestellt) {
+    for (const [id, wert] of Object.entries(baseTargets)) {
+      if (einheitVon(id) === 'sek' && wert > 0) baseTargets[id] = inSekunden(wert)
+    }
+  }
   // Früher wurde eine Klasse gewählt; daraus wird das passende System
   const system =
     gespeichert.system ??
@@ -1120,6 +1157,7 @@ function migriereSpielstand(gespeichert) {
     system,
     klasse,
     systemGewechselt: gespeichert.systemGewechselt ?? null,
+    zeitUmgestellt: true,
     varianten: gespeichert.varianten ?? {},
     stufenWechsel: gespeichert.stufenWechsel ?? [],
     gender: normalizeGender(gespeichert.gender),

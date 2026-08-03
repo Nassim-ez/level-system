@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import {
@@ -9,6 +9,7 @@ import {
   stepXpMax,
   resolveQuest,
   verteileMinuten,
+  SEKUNDEN_SCHRITT,
 } from '../data/quests.js'
 import { tagesplan } from '../data/trainingssysteme.js'
 import { RANK_TESTS, buildRankTest, nextRank } from '../data/ranks.js'
@@ -149,6 +150,106 @@ function Ablauf({ quest, schritt, onWeiter, onAbbruch, onInfo }) {
           ))}
         </div>
       </Panel>
+    </div>
+  )
+}
+
+/* --------------------------------------------------------------------- */
+/* Zeit-Quest: Zähler in Viertelminuten plus mitlaufender Countdown       */
+/* --------------------------------------------------------------------- */
+function ZeitQuest({ quest, stand, onZeit, onInfo }) {
+  const [laeuft, setLaeuft] = useState(false)
+  const [rest, setRest] = useState(0)
+  const offen = Math.max(0, quest.ziel - stand)
+
+  // Der Countdown zählt nur herunter. Gemeldet wird erst im Effekt darunter –
+  // im State-Updater wäre das ein Seiteneffekt, den React doppelt ausführt.
+  useEffect(() => {
+    if (!laeuft) return
+    const timer = setInterval(() => setRest((r) => Math.max(0, r - 1)), 1000)
+    return () => clearInterval(timer)
+  }, [laeuft])
+
+  // Runde durch: anhalten und die Zeit gutschreiben
+  useEffect(() => {
+    if (!laeuft || rest > 0) return
+    setLaeuft(false)
+    onZeit(SEKUNDEN_SCHRITT)
+  }, [laeuft, rest, onZeit])
+
+  // Nach einer Pause läuft die angebrochene Runde weiter
+  const starten = () => {
+    if (rest === 0) setRest(Math.min(SEKUNDEN_SCHRITT, offen || SEKUNDEN_SCHRITT))
+    setLaeuft(true)
+  }
+
+  return (
+    <div
+      className="border p-3"
+      style={{ borderColor: 'var(--line)', borderRadius: '12px' }}
+    >
+      <p className="text-[16px] font-semibold">
+        {quest.name}
+        {onInfo && <InfoKnopf onClick={onInfo} />}
+      </p>
+      <p style={{ ...orbitron, fontSize: '10px', color: 'var(--dim)', letterSpacing: '1px' }}>
+        {quest.stat} · +{quest.xp} XP
+      </p>
+      {quest.hinweis && (
+        <p style={{ fontSize: '11px', color: 'var(--dim)' }}>{quest.hinweis}</p>
+      )}
+
+      <p className="mt-2" style={{ ...orbitron, fontSize: '13px', color: 'var(--xp)' }}>
+        {stand} / {quest.ziel} {quest.unit}
+      </p>
+      <div
+        className="mt-1 h-[6px] w-full overflow-hidden rounded-full"
+        style={{ background: '#0f1a2e' }}
+      >
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${Math.min(100, (stand / (quest.ziel || 1)) * 100)}%`,
+            background: 'linear-gradient(90deg, #2e7fd4, var(--xp))',
+            transition: 'width .3s',
+          }}
+        />
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onZeit(SEKUNDEN_SCHRITT)}
+          className="flex-1 bg-transparent px-3 py-1.5"
+          style={{
+            ...orbitron,
+            fontSize: '10px',
+            letterSpacing: '1px',
+            color: 'var(--glow)',
+            border: '1px solid var(--glow)',
+            borderRadius: '8px',
+          }}
+        >
+          +{SEKUNDEN_SCHRITT} SEK
+        </button>
+        <button
+          type="button"
+          onClick={() => (laeuft ? setLaeuft(false) : starten())}
+          title={laeuft ? 'Pause' : 'Countdown starten'}
+          className="shrink-0 bg-transparent px-3 py-1.5"
+          style={{
+            ...orbitron,
+            fontSize: '10px',
+            letterSpacing: '1px',
+            color: laeuft ? 'var(--warn)' : 'var(--xp)',
+            border: `1px solid ${laeuft ? 'var(--warn)' : 'rgba(143,224,255,.5)'}`,
+            borderRadius: '8px',
+            minWidth: 74,
+          }}
+        >
+          {laeuft ? `❚❚ ${rest}s` : rest > 0 ? `▶ ${rest}s` : '▶ TIMER'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -409,6 +510,27 @@ function Quests() {
         <div className="flex flex-col gap-2">
           {plan.map((id) => {
             const q = resolveQuest(id, state)
+            if (q.einheit === 'sek' && !doneToday.includes(q.id)) {
+              return (
+                <ZeitQuest
+                  key={id}
+                  quest={q}
+                  stand={questProgress.zeit?.[q.id] ?? 0}
+                  onInfo={q.uebungId ? () => setBeiUebungen(q.uebungId) : null}
+                  onZeit={(sekunden) =>
+                    dispatch({
+                      type: 'LOG_ZEIT',
+                      id: q.id,
+                      sekunden,
+                      xp: q.xp,
+                      stat: q.stat,
+                      kategorie: q.kategorie,
+                      name: q.name,
+                    })
+                  }
+                />
+              )
+            }
             return (
               <QuestRow
                 key={id}

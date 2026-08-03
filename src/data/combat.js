@@ -30,7 +30,9 @@ export const ANGRIFFE = [
   { id: 'kniebeugen', name: 'Kniebeugen', art: 'kraft', menge: 5, einheit: '+5', basis: 5 },
   { id: 'klimmzuege', name: 'Klimmzüge', art: 'kraft', menge: 1, einheit: '+1 ×5', basis: 5 },
   { id: 'crunches', name: 'Crunches', art: 'core', menge: 5, einheit: '+5', basis: 5 },
-  { id: 'knielauf', name: 'Knielauf', art: 'ausdauer', menge: 20, einheit: '+20 ×0,5', basis: 10 },
+  // Ausdauer läuft auf Zeit: 15 Sekunden kosten so viel Belastung wie
+  // früher 20 Wiederholungen und richten denselben Schaden an
+  { id: 'knielauf', name: 'Knielauf', art: 'ausdauer', menge: 15, einheit: '+15 Sek', basis: 10, zeit: true },
   { id: 'burpees', name: 'Burpees', art: 'tempo', menge: 5, einheit: '+5 ×3', basis: 15 },
 ]
 
