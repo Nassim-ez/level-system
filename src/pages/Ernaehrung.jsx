@@ -9,6 +9,7 @@ import {
   proteinBedarf,
   proteinFuer,
   findeLebensmittel,
+  PROTEIN_JE_KG,
 } from '../data/lebensmittel.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
@@ -358,9 +359,9 @@ function Ernaehrung({ onZurueck }) {
   const bedarf = proteinBedarf(state.gewicht)
   const anteil = bedarf > 0 ? Math.min(100, (summe / bedarf) * 100) : 0
 
-  // Was heute schon öfter eingetragen wurde, steht oben; aufgefüllt wird
-  // mit den geläufigsten Eiweißquellen. Die Liste ist kurz genug, um sie
-  // bei jedem Rendern neu zu bilden.
+  // Was heute schon öfter eingetragen wurde, steht oben. Aufgefüllt wird
+  // aus den Daten selbst – je Kategorie die eiweißreichste Quelle –, damit
+  // die Schnellwahl auch bei einem ausgetauschten Katalog trägt.
   const haeufig = (() => {
     const zaehler = {}
     for (const e of eintraege) {
@@ -370,9 +371,29 @@ function Ernaehrung({ onZurueck }) {
       .sort((a, b) => b[1] - a[1])
       .map(([id]) => findeLebensmittel(id))
       .filter(Boolean)
-    const auffueller = ['magerquark', 'haehnchenbrust', 'ei', 'whey', 'skyr']
+
+    // Erste Wahl sind geläufige Alltagsquellen, sofern der Katalog sie
+    // kennt. Ein ausgetauschter Katalog bringt andere IDs mit – dann füllt
+    // je Kategorie die eiweißreichste Quelle auf.
+    const geläufig = ['magerquark', 'haehnchenbrust', 'ei', 'whey', 'skyr']
       .map(findeLebensmittel)
-      .filter((l) => l && !sortiert.some((s) => s.id === l.id))
+      .filter(Boolean)
+
+    const besteJeKategorie = Object.keys(KATEGORIEN)
+      .map(
+        (kategorie) =>
+          LEBENSMITTEL.filter((l) => l.kategorie === kategorie).sort(
+            (a, b) => (b.protein ?? 0) - (a.protein ?? 0),
+          )[0],
+      )
+      .filter(Boolean)
+      .sort((a, b) => (b.protein ?? 0) - (a.protein ?? 0))
+
+    const auffueller = [...geläufig, ...besteJeKategorie].filter(
+      (l, i, alle) =>
+        !sortiert.some((s) => s.id === l.id) &&
+        alle.findIndex((x) => x.id === l.id) === i,
+    )
     return [...sortiert, ...auffueller].slice(0, 5)
   })()
 
@@ -428,7 +449,8 @@ function Ernaehrung({ onZurueck }) {
               {summe} / {bedarf} g
             </p>
             <p style={{ fontSize: '12px', color: 'var(--dim)' }}>
-              Eiweiß · {state.gewicht} kg × 1,6 g
+              Eiweiß · {state.gewicht} kg ×{' '}
+              {String(PROTEIN_JE_KG).replace('.', ',')} g
             </p>
           </div>
           <button
