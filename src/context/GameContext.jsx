@@ -14,8 +14,10 @@ import {
   varianteOffen,
   STUFENWECHSEL_ANTEIL,
   EINSTIEG_ZIEL,
+  PROTEIN_XP,
 } from '../data/quests.js'
 import { CLASSES } from '../data/classes.js'
+import { proteinBedarf } from '../data/lebensmittel.js'
 import {
   TRAININGSSYSTEME,
   KLASSE_ZU_SYSTEM,
@@ -106,6 +108,11 @@ const initialState = {
   // an derselben Tür. Mehrere Verluste an verschiedenen Türen sind möglich.
   lostItems: [],
   klasse: null,
+  // Körpergewicht, ausschließlich für die Berechnung des Eiweißbedarfs
+  gewicht: null,
+  // Eiweiß des laufenden Tages. Der Serienzähler ist reine Anzeige:
+  // kein Bonus, keine Strafe, keine Mahnung bei Nichterreichen.
+  ernaehrung: { date: null, eintraege: [], streak: 0, belohnt: false },
   // Gewähltes Trainingssystem – bestimmt Wochenplan, Klasse und XP-Bonus
   system: null,
   systemGewechselt: null,
@@ -318,6 +325,21 @@ function reducer(state, action) {
         })
       }
 
+      // Eiweiß: der Tag beginnt leer. Die Serie zählt erfüllte Tage, mehr
+      // nicht – kein Bonus, keine Strafe, keine Meldung beim Abreißen.
+      const eiweissBedarf = proteinBedarf(state.gewicht)
+      const eiweissGestern = (state.ernaehrung?.eintraege ?? []).reduce(
+        (summe, e) => summe + (e.protein ?? 0),
+        0,
+      )
+      const eiweissGedeckt = eiweissBedarf > 0 && eiweissGestern >= eiweissBedarf
+      const ernaehrung = {
+        date: action.today,
+        eintraege: [],
+        streak: eiweissGedeckt ? (state.ernaehrung?.streak ?? 0) + 1 : 0,
+        belohnt: false,
+      }
+
       // Erledigte Wochen-Aufgaben aus dem Pool entfernen, dann neu ziehen
       const poolTasks = state.poolTasks.filter((t) => !t.done)
       const drawnTask =
@@ -338,6 +360,7 @@ function reducer(state, action) {
         poolTasks,
         drawnTask,
         daily,
+        ernaehrung,
       }
     }
     case 'LOG_ZEIT': {
@@ -468,6 +491,46 @@ function reducer(state, action) {
           detail: `Rang ${action.rank} · Level ${level}`,
         }),
       }
+    }
+    case 'SET_GEWICHT': {
+      const gewicht = Number(action.gewicht)
+      if (!Number.isFinite(gewicht) || gewicht <= 0) return state
+      return { ...state, gewicht: Math.round(gewicht) }
+    }
+    case 'ERNAEHRUNG_ADD': {
+      const eintrag = {
+        lebensmittelId: action.lebensmittelId,
+        menge: action.menge,
+        protein: action.protein,
+        zeit: new Date().toISOString(),
+      }
+      const ernaehrung = {
+        ...state.ernaehrung,
+        date: todayKey(),
+        eintraege: [...(state.ernaehrung?.eintraege ?? []), eintrag],
+      }
+      let next = { ...state, ernaehrung }
+      // Bedarf gedeckt: einmal am Tag gibt es XP und einen Log-Eintrag
+      const bedarf = proteinBedarf(state.gewicht)
+      const summe = ernaehrung.eintraege.reduce((s, e) => s + (e.protein ?? 0), 0)
+      if (bedarf > 0 && summe >= bedarf && !ernaehrung.belohnt) {
+        next = {
+          ...next,
+          ernaehrung: { ...ernaehrung, belohnt: true },
+          log: withLog(state.log, 'Eiweißbedarf gedeckt', {
+            detail: `${summe} von ${bedarf} g`,
+            xp: PROTEIN_XP,
+          }),
+        }
+        next = reducer(next, { type: 'ADD_XP', amount: PROTEIN_XP })
+      }
+      return next
+    }
+    case 'ERNAEHRUNG_REMOVE': {
+      const eintraege = (state.ernaehrung?.eintraege ?? []).filter(
+        (_, i) => i !== action.index,
+      )
+      return { ...state, ernaehrung: { ...state.ernaehrung, eintraege } }
     }
     case 'SET_VARIANTE': {
       // Eigene Wahl der Übungsstufe, gilt bis zum nächsten Rangwechsel
@@ -1158,6 +1221,14 @@ function migriereSpielstand(gespeichert) {
     klasse,
     systemGewechselt: gespeichert.systemGewechselt ?? null,
     zeitUmgestellt: true,
+    gewicht: gespeichert.gewicht ?? null,
+    ernaehrung: {
+      date: null,
+      eintraege: [],
+      streak: 0,
+      belohnt: false,
+      ...gespeichert.ernaehrung,
+    },
     varianten: gespeichert.varianten ?? {},
     stufenWechsel: gespeichert.stufenWechsel ?? [],
     gender: normalizeGender(gespeichert.gender),

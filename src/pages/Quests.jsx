@@ -10,10 +10,13 @@ import {
   resolveQuest,
   verteileMinuten,
   SEKUNDEN_SCHRITT,
+  PROTEIN_XP,
 } from '../data/quests.js'
 import { tagesplan } from '../data/trainingssysteme.js'
 import { RANK_TESTS, buildRankTest, nextRank } from '../data/ranks.js'
 import Uebungen from './Uebungen.jsx'
+import Ernaehrung from './Ernaehrung.jsx'
+import { proteinBedarf } from '../data/lebensmittel.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -254,6 +257,75 @@ function ZeitQuest({ quest, stand, onZeit, onInfo }) {
   )
 }
 
+/* --------------------------------------------------------------------- */
+/* Eiweiß: dauerhafte Zusatzquest. Ohne Pflicht, ohne Mahnung, ohne Abzug. */
+/* --------------------------------------------------------------------- */
+function EiweissQuest({ state, onOeffnen }) {
+  const bedarf = proteinBedarf(state.gewicht)
+  const summe = (state.ernaehrung?.eintraege ?? []).reduce(
+    (s, e) => s + (e.protein ?? 0),
+    0,
+  )
+  const gedeckt = bedarf > 0 && summe >= bedarf
+
+  return (
+    <div
+      className="flex items-center justify-between gap-3 border p-3"
+      style={{
+        borderColor: gedeckt ? 'rgba(143,224,255,.4)' : 'var(--line)',
+        borderRadius: '12px',
+      }}
+    >
+      <div className="min-w-0">
+        <p
+          className="text-[16px] font-semibold"
+          style={gedeckt ? { color: 'var(--xp)' } : undefined}
+        >
+          Eiweißbedarf decken
+        </p>
+        <p style={{ ...orbitron, fontSize: '10px', color: 'var(--dim)', letterSpacing: '1px' }}>
+          ZUSATZ · +{PROTEIN_XP} XP
+        </p>
+        <p style={{ fontSize: '11px', color: 'var(--dim)' }}>
+          {bedarf > 0
+            ? `${summe} / ${bedarf} g Eiweiß heute`
+            : 'Körpergewicht eintragen, dann rechnet das System den Bedarf'}
+        </p>
+      </div>
+      {gedeckt ? (
+        <span
+          className="shrink-0"
+          style={{
+            ...orbitron,
+            fontSize: '10px',
+            letterSpacing: '2px',
+            color: 'var(--xp)',
+            textShadow: '0 0 8px rgba(143,224,255,.6)',
+          }}
+        >
+          ✓ GEDECKT
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onOeffnen}
+          className="shrink-0 bg-transparent px-3 py-1.5"
+          style={{
+            ...orbitron,
+            fontSize: '10px',
+            letterSpacing: '2px',
+            color: 'var(--glow)',
+            border: '1px solid var(--glow)',
+            borderRadius: '8px',
+          }}
+        >
+          EINTRAGEN
+        </button>
+      )}
+    </div>
+  )
+}
+
 function QuestRow({
   name,
   target,
@@ -335,6 +407,7 @@ function Quests() {
   const [taskInput, setTaskInput] = useState('')
   const [beiUebungen, setBeiUebungen] = useState(null)
   const [ablauf, setAblauf] = useState(null)
+  const [beiErnaehrung, setBeiErnaehrung] = useState(false)
 
   const plan = tagesplan(state.system, dayType)
   const cap = stepXpMax(dayType)
@@ -355,6 +428,9 @@ function Quests() {
       buildRankTest(state.rank, state.baseTargets))
     : null
   const rankProgress = questProgress.rankTest ?? {}
+
+  if (beiErnaehrung)
+    return <Ernaehrung onZurueck={() => setBeiErnaehrung(false)} />
 
   // Die Übungsseite legt sich über alles, der Ablauf bleibt darunter offen
   if (beiUebungen)
@@ -574,6 +650,10 @@ function Quests() {
               }
             />
           )}
+          <EiweissQuest
+            state={state}
+            onOeffnen={() => setBeiErnaehrung(true)}
+          />
           <QuestRow
             name="Tabletten einnehmen"
             stat="VIT"

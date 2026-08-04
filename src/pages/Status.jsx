@@ -217,7 +217,112 @@ function Status() {
         </div>
       </Panel>
       <TrainingssystemPanel />
+      <GewichtPanel />
     </div>
+  )
+}
+
+/* --------------------------------------------------------------------- */
+/* Körpergewicht – ausschließlich Grundlage des Eiweißbedarfs             */
+/* --------------------------------------------------------------------- */
+function GewichtPanel() {
+  const { state, dispatch } = useGame()
+  const [bearbeiten, setBearbeiten] = useState(false)
+  const [wert, setWert] = useState('')
+
+  if (!state.gewicht && !bearbeiten) return null
+
+  const zahl = Number(wert.replace(',', '.'))
+  const gueltig = Number.isFinite(zahl) && zahl > 0
+
+  return (
+    <Panel title="KÖRPERGEWICHT">
+      {bearbeiten ? (
+        <>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              inputMode="decimal"
+              value={wert}
+              onChange={(e) => setWert(e.target.value)}
+              placeholder={String(state.gewicht ?? '')}
+              className="min-w-0 flex-1 px-3 py-2"
+              style={{
+                background: '#0e1826',
+                border: '1px solid var(--line)',
+                borderRadius: 10,
+                color: 'var(--text)',
+                fontSize: '16px',
+              }}
+            />
+            <span style={{ ...orbitron, fontSize: '12px', color: 'var(--dim)' }}>KG</span>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setBearbeiten(false)}
+              className="flex-1 bg-transparent px-3 py-2"
+              style={{
+                ...orbitron,
+                fontSize: '10px',
+                letterSpacing: '2px',
+                color: 'var(--dim)',
+                border: '1px solid var(--line)',
+                borderRadius: 10,
+              }}
+            >
+              ABBRECHEN
+            </button>
+            <button
+              type="button"
+              disabled={!gueltig}
+              onClick={() => {
+                dispatch({ type: 'SET_GEWICHT', gewicht: zahl })
+                setBearbeiten(false)
+                setWert('')
+              }}
+              className="flex-1 bg-transparent px-3 py-2 disabled:opacity-40"
+              style={{
+                ...orbitron,
+                fontSize: '10px',
+                letterSpacing: '2px',
+                color: 'var(--glow)',
+                border: '1px solid var(--glow)',
+                borderRadius: 10,
+              }}
+            >
+              SPEICHERN
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p style={{ ...orbitron, fontSize: '18px', color: 'var(--xp)' }}>
+              {state.gewicht} kg
+            </p>
+            <p style={{ fontSize: '11.5px', color: 'var(--dim)' }}>
+              Grundlage des Eiweißbedarfs, sonst nichts.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBearbeiten(true)}
+            className="shrink-0 bg-transparent px-3 py-1.5"
+            style={{
+              ...orbitron,
+              fontSize: 9,
+              letterSpacing: '2px',
+              color: 'var(--dim)',
+              border: '1px solid var(--line)',
+              borderRadius: 8,
+            }}
+          >
+            ÄNDERN
+          </button>
+        </div>
+      )}
+    </Panel>
   )
 }
 

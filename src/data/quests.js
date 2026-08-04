@@ -6,6 +6,8 @@ import { systemOder, tagesplan, tagestyp } from './trainingssysteme.js'
 // entscheidet die Variante – die hängt am Rang oder an der eigenen Wahl.
 // Welche Quests an einem Tag anstehen, bestimmt das Trainingssystem.
 export const QUEST_XP = 60
+// Eiweißbedarf gedeckt – eine Zugabe, kein Pflichtteil
+export const PROTEIN_XP = 50
 
 // Kategorie → Attribut, auf das die Übung einzahlt
 export const KATEGORIE_STAT = {
