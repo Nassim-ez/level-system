@@ -261,7 +261,7 @@ function ZeitQuest({ quest, stand, onZeit, onInfo }) {
 /* Eiweiß: dauerhafte Zusatzquest. Ohne Pflicht, ohne Mahnung, ohne Abzug. */
 /* --------------------------------------------------------------------- */
 function EiweissQuest({ state, onOeffnen }) {
-  const bedarf = proteinBedarf(state.gewicht)
+  const bedarf = proteinBedarf(state.gewicht) ?? 0
   const summe = (state.ernaehrung?.eintraege ?? []).reduce(
     (s, e) => s + (e.protein ?? 0),
     0,
@@ -288,7 +288,10 @@ function EiweissQuest({ state, onOeffnen }) {
         </p>
         <p style={{ fontSize: '11px', color: 'var(--dim)' }}>
           {bedarf > 0
-            ? `${summe} / ${bedarf} g Eiweiß heute`
+            ? `${Math.round(summe * 10) / 10} / ${bedarf} g Eiweiß heute`.replace(
+                '.',
+                ',',
+              )
             : 'Körpergewicht eintragen, dann rechnet das System den Bedarf'}
         </p>
       </div>

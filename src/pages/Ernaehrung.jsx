@@ -6,11 +6,23 @@ import {
   KATEGORIEN,
   HINWEIS_TEXT,
   BELEG,
+  PROTEIN_PRO_KG,
   proteinBedarf,
-  proteinFuer,
-  findeLebensmittel,
-  PROTEIN_JE_KG,
+  proteinVon,
 } from '../data/lebensmittel.js'
+
+// Die Datenbank liefert keine Suchfunktion mit – hier reicht ein Zugriff
+// über die ID.
+function findeLebensmittel(id) {
+  return LEBENSMITTEL.find((l) => l.id === id) ?? null
+}
+
+// Eiweißmengen kommen mit einer Nachkommastelle aus der Datenbank.
+// Ganze Zahlen bleiben ohne Nachkomma, der Rest bekommt ein Komma.
+function zeigeGramm(wert) {
+  const zahl = Math.round((wert ?? 0) * 10) / 10
+  return String(zahl).replace('.', ',')
+}
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -98,8 +110,8 @@ function MengenEingabe({ lebensmittel, onHinzufuegen, onZurueck }) {
   const menge =
     modus === 'gramm'
       ? Math.max(0, Number(gramm.replace(',', '.')) || 0)
-      : Math.round(portionen * lebensmittel.portionGramm)
-  const protein = proteinFuer(lebensmittel, menge)
+      : Math.round(portionen * lebensmittel.portion)
+  const protein = proteinVon(lebensmittel, menge)
 
   return (
     <Panel title="MENGE">
@@ -107,8 +119,8 @@ function MengenEingabe({ lebensmittel, onHinzufuegen, onZurueck }) {
         <div className="min-w-0">
           <p className="text-[17px] font-semibold">{lebensmittel.name}</p>
           <p style={{ fontSize: '11.5px', color: 'var(--dim)' }}>
-            {lebensmittel.protein} g Eiweiß je 100 g · 1 {lebensmittel.portionName} ={' '}
-            {lebensmittel.portionGramm} g
+            {zeigeGramm(lebensmittel.protein)} g Eiweiß je 100 g · {lebensmittel.portionName}{' '}
+            = {lebensmittel.portion} g
           </p>
         </div>
         <button
@@ -221,7 +233,7 @@ function MengenEingabe({ lebensmittel, onHinzufuegen, onZurueck }) {
       <p className="mt-3 text-center" style={{ fontSize: '14px' }}>
         {menge} g ergeben{' '}
         <b style={{ ...orbitron, fontSize: '17px', color: 'var(--xp)' }}>
-          {protein} g
+          {zeigeGramm(protein)} g
         </b>{' '}
         Eiweiß
       </p>
@@ -334,7 +346,7 @@ function Suche({ onWaehlen, onZurueck }) {
               className="shrink-0"
               style={{ ...orbitron, fontSize: 10, color: 'var(--xp)' }}
             >
-              {l.protein} g
+              {zeigeGramm(l.protein)} g
             </span>
           </button>
         ))}
@@ -356,7 +368,7 @@ function Ernaehrung({ onZurueck }) {
 
   const eintraege = state.ernaehrung?.eintraege ?? []
   const summe = eintraege.reduce((s, e) => s + (e.protein ?? 0), 0)
-  const bedarf = proteinBedarf(state.gewicht)
+  const bedarf = proteinBedarf(state.gewicht) ?? 0
   const anteil = bedarf > 0 ? Math.min(100, (summe / bedarf) * 100) : 0
 
   // Was heute schon öfter eingetragen wurde, steht oben. Aufgefüllt wird
@@ -446,11 +458,11 @@ function Ernaehrung({ onZurueck }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p style={{ ...orbitron, fontSize: '22px', color: 'var(--xp)' }}>
-              {summe} / {bedarf} g
+              {zeigeGramm(summe)} / {bedarf} g
             </p>
             <p style={{ fontSize: '12px', color: 'var(--dim)' }}>
               Eiweiß · {state.gewicht} kg ×{' '}
-              {String(PROTEIN_JE_KG).replace('.', ',')} g
+              {String(PROTEIN_PRO_KG).replace('.', ',')} g
             </p>
           </div>
           <button
@@ -552,7 +564,7 @@ function Ernaehrung({ onZurueck }) {
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <span style={{ ...orbitron, fontSize: 12, color: 'var(--xp)' }}>
-                      {e.protein} g
+                      {zeigeGramm(e.protein)} g
                     </span>
                     <button
                       type="button"

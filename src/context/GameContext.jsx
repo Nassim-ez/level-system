@@ -327,7 +327,7 @@ function reducer(state, action) {
 
       // Eiweiß: der Tag beginnt leer. Die Serie zählt erfüllte Tage, mehr
       // nicht – kein Bonus, keine Strafe, keine Meldung beim Abreißen.
-      const eiweissBedarf = proteinBedarf(state.gewicht)
+      const eiweissBedarf = proteinBedarf(state.gewicht) ?? 0
       const eiweissGestern = (state.ernaehrung?.eintraege ?? []).reduce(
         (summe, e) => summe + (e.protein ?? 0),
         0,
@@ -511,14 +511,15 @@ function reducer(state, action) {
       }
       let next = { ...state, ernaehrung }
       // Bedarf gedeckt: einmal am Tag gibt es XP und einen Log-Eintrag
-      const bedarf = proteinBedarf(state.gewicht)
+      const bedarf = proteinBedarf(state.gewicht) ?? 0
       const summe = ernaehrung.eintraege.reduce((s, e) => s + (e.protein ?? 0), 0)
       if (bedarf > 0 && summe >= bedarf && !ernaehrung.belohnt) {
         next = {
           ...next,
           ernaehrung: { ...ernaehrung, belohnt: true },
           log: withLog(state.log, 'Eiweißbedarf gedeckt', {
-            detail: `${summe} von ${bedarf} g`,
+            // Nachkommastellen deutsch schreiben
+            detail: `${String(Math.round(summe * 10) / 10).replace('.', ',')} von ${bedarf} g`,
             xp: PROTEIN_XP,
           }),
         }
