@@ -7,8 +7,8 @@ Letzte Aktualisierung: 10.08.2026
 
 ## Wo das Projekt steht
 
-Spielbar sind E- und D-Rang mit je drei Dungeons zu fünf Türen, dazu der
-Tages-Dungeon, das Item- und Set-System bis C-Rang, die
+Spielbar sind E-, D- und C-Rang mit je drei Dungeons zu fünf Türen, dazu
+der Tages-Dungeon, das Item- und Set-System bis C-Rang, die
 Übungsdatenbank mit Variantenleiter, fünf Trainingssysteme, der
 Mobility-Ablauf, das Eiweiß-Tracking und die Sicherung des Spielstands als
 Datei.
@@ -21,15 +21,16 @@ Jede Schemaänderung braucht eine Migration in `migriereSpielstand`
 
 ## DUNGEON
 
-- **Dungeons für C, B, A und S.** Je drei Dungeons mit fünf Türen nach dem
+- **Dungeons für B, A und S.** Je drei Dungeons mit fünf Türen nach dem
   Muster des E-Rangs (`src/data/dungeons.js`). Eigene Gegnernamen passend
   zum Thema des Dungeons, HP und Schaden über den Rangfaktor skaliert
   (`RANG_FAKTOR` in `src/data/combat.js`). Keine Wiederverwendung
   bestehender Gegner.
-  **Rang D ist gebaut:** Glutschacht, Salzdom und Rostkessel. Die Türen
-  tragen Basiswerte auf E-Niveau, `skaliereTueren(rank, tueren)` rechnet
-  sie auf den Rang hoch – für C bis S denselben Weg nehmen.
-  `HOEHERE_DUNGEONS` ist weiterhin nur eine Vorschauliste.
+  **Gebaut sind D und C:** Glutschacht, Salzdom, Rostkessel (D) sowie
+  Klammgrat, Tiefwasserstollen, Dornbruch (C). Die Türen tragen Basiswerte
+  auf E-Niveau, `skaliereTueren(rank, tueren)` rechnet sie auf den Rang
+  hoch – für B bis S denselben Weg nehmen. `HOEHERE_DUNGEONS` ist
+  weiterhin nur eine Vorschauliste und nennt jetzt B, A und S.
 - **Event-Dungeons.** Zeitlich begrenzt verfügbar, eigener Gegner, eigene
   Beute.
 - **Monats-Boss.** Einmal im Monat, deutlich stärker als ein normaler
