@@ -159,6 +159,8 @@ function Auswahl({ state, dispatch }) {
         )}
       </Panel>
 
+      {/* Sind alle Ränge gebaut, entfällt die Vorschau */}
+      {HOEHERE_DUNGEONS.length > 0 && (
       <Panel title="HÖHERE RÄNGE">
         <div className="flex flex-col gap-2">
           {HOEHERE_DUNGEONS.map((d) => (
@@ -199,6 +201,7 @@ function Auswahl({ state, dispatch }) {
           D-Dungeons.
         </p>
       </Panel>
+      )}
     </div>
   )
 }

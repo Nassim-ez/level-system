@@ -144,6 +144,39 @@ export function moodIndex(hp, maxHp) {
   return pct > 0.75 ? 0 : pct > 0.5 ? 1 : pct > 0.25 ? 2 : 3
 }
 
+// ---------------------------------------------------------------------------
+// Phasen eines Bosses
+//
+// Standardmäßig folgen die Phasen den vier Stimmungsstufen, also drei
+// Wechsel über den Kampf. Ein Boss kann mit dem Feld `phasen` eine eigene
+// Staffelung mitbringen: je Eintrag der HP-Anteil, ab dem sie gilt, und der
+// Text, der beim Übergang erscheint.
+// ---------------------------------------------------------------------------
+export const PHASEN_STANDARD = [0.75, 0.5, 0.25, 0]
+
+/**
+ * Aktuelle Phase eines Gegners. Ohne eigene Staffelung entspricht sie der
+ * Stimmungsstufe, damit sich am Verhalten bestehender Bosse nichts ändert.
+ */
+export function phasenIndex(hp, maxHp, phasen) {
+  const grenzen = phasen?.length
+    ? phasen.map((p) => p.ab ?? 0)
+    : PHASEN_STANDARD
+  const pct = maxHp > 0 ? hp / maxHp : 0
+  let index = 0
+  grenzen.forEach((grenze, i) => {
+    if (pct <= grenze) index = i
+  })
+  // Über der obersten Grenze steht immer die erste Phase
+  return pct > grenzen[0] ? 0 : index
+}
+
+/** Text zum Phasenwechsel, sofern der Gegner einen mitbringt */
+export function phasenText(tuer, index) {
+  if (tuer?.phasen?.length) return tuer.phasen[index]?.text ?? null
+  return tuer?.mood?.[index] ?? null
+}
+
 // XP wie im Mockup
 export const TUER_XP = 60
 export const BOSS_XP = 200

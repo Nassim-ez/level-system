@@ -136,6 +136,7 @@ function snapshot(state) {
     onboarded: state.onboarded,
     level: state.level,
     rank: state.rank,
+    abschluss: state.abschluss,
     unlockedTitles: state.unlockedTitles,
   }
 }
@@ -157,6 +158,10 @@ function PopupManager() {
     if (state.rank !== p.rank) {
       add.push({ type: 'rank', rank: state.rank })
     }
+    // Abschluss der Rangleiter geht dem Titel voraus
+    if (state.abschluss && !p.abschluss) {
+      add.push({ type: 'abschluss', ...state.abschluss })
+    }
     for (const id of state.unlockedTitles) {
       if (!p.unlockedTitles.includes(id)) {
         add.push({
@@ -177,6 +182,7 @@ function PopupManager() {
   if (!current) return null
   const close = () => {
     if (current.type === 'stufen') dispatch({ type: 'CLEAR_STUFENWECHSEL' })
+    if (current.type === 'abschluss') dispatch({ type: 'CLEAR_ABSCHLUSS' })
     setQueue((q) => q.slice(1))
   }
 
@@ -226,6 +232,39 @@ function PopupManager() {
     )
   }
 
+  if (current.type === 'abschluss') {
+    return (
+      <SystemPopup title="DIE RANGLEITER IST GESCHLOSSEN" onClose={close}>
+        <p className="mt-3 text-[15px]">
+          <span
+            style={{
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '17px',
+              fontWeight: 700,
+              color: 'var(--danger)',
+              textShadow: '0 0 12px rgba(255,77,94,.7)',
+            }}
+          >
+            {current.boss}
+          </span>{' '}
+          ist gefallen.
+        </p>
+        <p
+          className="mt-2"
+          style={{ fontSize: '13px', color: 'var(--dim)', lineHeight: 1.6 }}
+        >
+          {current.dungeon} ist geschafft. Von E bis S ist kein Tor mehr
+          verschlossen – es gibt niemanden mehr über dir.
+        </p>
+        <p
+          className="mt-3"
+          style={{ fontSize: '12px', color: 'var(--glow)', lineHeight: 1.5 }}
+        >
+          Die Dungeons bleiben offen. Was du ab hier tust, tust du für dich.
+        </p>
+      </SystemPopup>
+    )
+  }
   if (current.type === 'level') {
     return (
       <SystemPopup title="LEVEL UP!" onClose={close}>

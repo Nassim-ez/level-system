@@ -1,13 +1,13 @@
 # SYSTEM – Roadmap
 
 Offener Stand und die Regeln, die bei jeder weiteren Arbeit gelten.
-Letzte Aktualisierung: 10.08.2026
+Letzte Aktualisierung: 11.08.2026
 
 ---
 
 ## Wo das Projekt steht
 
-Spielbar sind E- bis A-Rang mit je drei Dungeons zu fünf Türen, dazu der
+Spielbar sind E- bis S-Rang mit je drei Dungeons zu fünf Türen, dazu der
 Tages-Dungeon, das Item- und Set-System bis C-Rang, die
 Übungsdatenbank mit Variantenleiter, fünf Trainingssysteme, der
 Mobility-Ablauf, das Eiweiß-Tracking und die Sicherung des Spielstands als
@@ -21,21 +21,28 @@ Jede Schemaänderung braucht eine Migration in `migriereSpielstand`
 
 ## DUNGEON
 
-- **Dungeons für S.** Drei Dungeons mit fünf Türen nach dem Muster des
-  E-Rangs (`src/data/dungeons.js`). Eigene Gegnernamen passend zum Thema,
-  HP und Schaden über den Rangfaktor skaliert (`RANG_FAKTOR` in
-  `src/data/combat.js`). Keine Wiederverwendung bestehender Gegner.
-  Vorgemerkt ist der Hohle Thron mit dem Nachtherrn als Boss; die Figur
-  `nacht` in `FightSprites.jsx` ist bewusst noch für ihn freigehalten.
-  **Gebaut sind D, C, B und A:** Glutschacht, Salzdom, Rostkessel (D),
-  Klammgrat, Tiefwasserstollen, Dornbruch (C), Aschewüste, Spiegelhallen,
-  Der Schlund (B) sowie Sturmauge, Blutmondzinne, Wandelgang (A). Die
-  Türen tragen Basiswerte auf E-Niveau, `skaliereTueren(rank, tueren)`
-  rechnet sie auf den Rang hoch – für S denselben Weg nehmen.
+- **Die Rangleiter ist vollständig.** E bis S stehen mit je drei Dungeons
+  zu fünf Türen (`src/data/dungeons.js`): Eisenhöhle, Knochengruft,
+  Nebelwald (E), Glutschacht, Salzdom, Rostkessel (D), Klammgrat,
+  Tiefwasserstollen, Dornbruch (C), Aschewüste, Spiegelhallen, Der
+  Schlund (B), Sturmauge, Blutmondzinne, Wandelgang (A) sowie
+  Scherbenhimmel, Stille Wiege und Hohler Thron (S). Alle Türen tragen
+  Basiswerte auf E-Niveau, `skaliereTueren(rank, tueren)` rechnet sie über
+  `RANG_FAKTOR` auf den Rang hoch.
+  Der Hohle Thron schließt die Leiter ab: Der Nachtherr nutzt die dafür
+  freigehaltene Figur `nacht`, hat über `hpFaktor: 2` das Doppelte des
+  Rangrahmens (3150 HP) und vier Phasenwechsel mit eigenem Text. Nach
+  seinem Sturz setzt der Reducer `thronBezwungen`, zeigt das
+  Abschluss-Popup und schaltet den Titel „Bezwinger der Nacht" frei.
   Ab Rang B fallen aufgewertete C-Items in der jeweils passenden Rarität
-  (legendär bei B, heroisch bei A), weil es eigene Stücke dieser Ränge
-  noch nicht gibt (siehe ITEMS). Sobald die da sind, gehören sie als Drops
-  eingetragen.
+  (legendär bei B, heroisch bei A, mystisch bei S), weil es eigene Stücke
+  dieser Ränge noch nicht gibt (siehe ITEMS). Sobald die da sind, gehören
+  sie als Drops eingetragen.
+- **Phasentexte für die bestehenden Bosse.** Seit dem S-Rang schreibt
+  `DungeonFight.jsx` bei jedem Phasenwechsel einen Text ins Kampflog. Ohne
+  eigenes `phasen`-Feld greift es auf `mood` zurück – die Texte aller
+  älteren Bosse sind damit erstmals sichtbar. Eigene Staffelungen für
+  einzelne Bosse sind jederzeit nachrüstbar.
 - **Event-Dungeons.** Zeitlich begrenzt verfügbar, eigener Gegner, eigene
   Beute.
 - **Monats-Boss.** Einmal im Monat, deutlich stärker als ein normaler
@@ -73,7 +80,10 @@ Jede Schemaänderung braucht eine Migration in `migriereSpielstand`
 
 ## OFFENE FRAGEN
 
-- Was passiert nach Rang S, wenn es keine Ränge mehr gibt?
+- Was passiert nach Rang S, wenn es keine Ränge mehr gibt? Das
+  Abschluss-Popup des Hohlen Throns beantwortet es vorläufig nur mit
+  einem Satz – die Dungeons bleiben offen, mehr steht nicht dahinter.
+  Event-Dungeons und Monats-Boss wären die naheliegende Fortsetzung.
 - Wie geht es weiter, wenn alle Dungeons geklärt sind?
 
 ---

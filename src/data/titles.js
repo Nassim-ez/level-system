@@ -31,6 +31,12 @@ export const TITLES = {
     beschreibung: 'Ersten Dungeon abgeschlossen',
     check: (s) => s.lifetime.dungeons >= 1,
   },
+  nachtbezwinger: {
+    id: 'nachtbezwinger',
+    name: 'Bezwinger der Nacht',
+    beschreibung: 'Den Nachtherrn auf dem Hohlen Thron besiegt',
+    check: (s) => s.thronBezwungen === true,
+  },
   aufsteiger: {
     id: 'aufsteiger',
     name: 'Aufsteiger',

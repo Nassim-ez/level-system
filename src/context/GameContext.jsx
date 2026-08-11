@@ -121,6 +121,10 @@ const initialState = {
   varianten: {},
   // Beim letzten Rangaufstieg gewechselte Stufen, bis das Popup sie zeigt
   stufenWechsel: [],
+  // Der Nachtherr auf dem Hohlen Thron ist gefallen – Ende der Rangleiter
+  thronBezwungen: false,
+  // Abschlussmeldung, bis das Popup sie gezeigt hat
+  abschluss: null,
   onboarded: false,
   unlockedTitles: ['neuling'],
   lifetime: { liegestuetze: 0, klimmzuege: 0, dungeons: 0, bestStreak: 0 },
@@ -553,6 +557,10 @@ function reducer(state, action) {
       if (!state.stufenWechsel?.length) return state
       return { ...state, stufenWechsel: [] }
     }
+    case 'CLEAR_ABSCHLUSS': {
+      if (!state.abschluss) return state
+      return { ...state, abschluss: null }
+    }
     case 'RESET_GAME': {
       localStorage.removeItem(STORAGE_KEY)
       return { ...initialState }
@@ -694,6 +702,14 @@ function reducer(state, action) {
           dungeons: (state.lifetime.dungeons ?? 0) + 1,
         },
         log,
+      }
+      // Der Hohle Thron schließt die Rangleiter ab – einmalige Abschlussmeldung
+      if (dungeon.finale && !state.thronBezwungen) {
+        next.thronBezwungen = true
+        next.abschluss = { dungeon: dungeon.name, boss: dungeon.boss }
+        next.log = withLog(next.log, 'Die Rangleiter ist geschlossen', {
+          detail: `${dungeon.boss} gefallen · ${dungeon.name}`,
+        })
       }
       next = reducer(next, { type: 'ADD_XP', amount: BOSS_XP })
       return next
@@ -1232,6 +1248,8 @@ function migriereSpielstand(gespeichert) {
     },
     varianten: gespeichert.varianten ?? {},
     stufenWechsel: gespeichert.stufenWechsel ?? [],
+    thronBezwungen: gespeichert.thronBezwungen === true,
+    abschluss: gespeichert.abschluss ?? null,
     gender: normalizeGender(gespeichert.gender),
   }
 }

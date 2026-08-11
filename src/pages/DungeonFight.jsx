@@ -33,6 +33,8 @@ import {
   berechneSchaden,
   gegnerSchaden,
   moodIndex,
+  phasenIndex,
+  phasenText,
   MOODS,
   AMBER,
   BELASTUNG_FARBEN,
@@ -297,11 +299,21 @@ function DungeonFight({ onExit, daily = false }) {
       ruettel()
       neu.log = nachricht(`${a.name} trifft für ${schaden} Schaden.`, 'me', neu)
 
+      // Phasenwechsel: der Gegner meldet sich, sobald er eine Stufe fällt
+      const vorherigePhase = neu.phase ?? 0
+      const jetzigePhase = phasenIndex(neu.enemyHp, neu.enemyMaxHp, tuer.phasen)
+      if (jetzigePhase > vorherigePhase && neu.enemyHp > 0) {
+        neu.phase = jetzigePhase
+        const text = phasenText(tuer, jetzigePhase)
+        if (text) neu.log = nachricht(text, 'bad', neu)
+      }
+
       if (neu.enemyHp === 0) {
         neu.lebende -= 1
         if (neu.lebende > 0) {
           anim('e', 'die', 400)
           neu.enemyHp = tuer.hp
+          neu.phase = 0
           neu.log = nachricht(`Ein Gegner fällt. Noch ${neu.lebende}.`, 'good', neu)
           return zugEnde(neu)
         }
