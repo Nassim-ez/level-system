@@ -7,8 +7,8 @@ Letzte Aktualisierung: 10.08.2026
 
 ## Wo das Projekt steht
 
-Spielbar sind E-, D-, C- und B-Rang mit je drei Dungeons zu fünf Türen,
-dazu der Tages-Dungeon, das Item- und Set-System bis C-Rang, die
+Spielbar sind E- bis A-Rang mit je drei Dungeons zu fünf Türen, dazu der
+Tages-Dungeon, das Item- und Set-System bis C-Rang, die
 Übungsdatenbank mit Variantenleiter, fünf Trainingssysteme, der
 Mobility-Ablauf, das Eiweiß-Tracking und die Sicherung des Spielstands als
 Datei.
@@ -21,20 +21,21 @@ Jede Schemaänderung braucht eine Migration in `migriereSpielstand`
 
 ## DUNGEON
 
-- **Dungeons für A und S.** Je drei Dungeons mit fünf Türen nach dem
-  Muster des E-Rangs (`src/data/dungeons.js`). Eigene Gegnernamen passend
-  zum Thema des Dungeons, HP und Schaden über den Rangfaktor skaliert
-  (`RANG_FAKTOR` in `src/data/combat.js`). Keine Wiederverwendung
-  bestehender Gegner.
-  **Gebaut sind D, C und B:** Glutschacht, Salzdom, Rostkessel (D),
-  Klammgrat, Tiefwasserstollen, Dornbruch (C) sowie Aschewüste,
-  Spiegelhallen, Der Schlund (B). Die Türen tragen Basiswerte auf
-  E-Niveau, `skaliereTueren(rank, tueren)` rechnet sie auf den Rang hoch –
-  für A und S denselben Weg nehmen. `HOEHERE_DUNGEONS` ist weiterhin nur
-  eine Vorschauliste und nennt jetzt A und S.
-  Die B-Dungeons lassen aufgewertete C-Items in legendärer Rarität fallen,
-  weil es eigene B-Stücke noch nicht gibt (siehe ITEMS). Sobald die da
-  sind, gehören sie als Drops eingetragen.
+- **Dungeons für S.** Drei Dungeons mit fünf Türen nach dem Muster des
+  E-Rangs (`src/data/dungeons.js`). Eigene Gegnernamen passend zum Thema,
+  HP und Schaden über den Rangfaktor skaliert (`RANG_FAKTOR` in
+  `src/data/combat.js`). Keine Wiederverwendung bestehender Gegner.
+  Vorgemerkt ist der Hohle Thron mit dem Nachtherrn als Boss; die Figur
+  `nacht` in `FightSprites.jsx` ist bewusst noch für ihn freigehalten.
+  **Gebaut sind D, C, B und A:** Glutschacht, Salzdom, Rostkessel (D),
+  Klammgrat, Tiefwasserstollen, Dornbruch (C), Aschewüste, Spiegelhallen,
+  Der Schlund (B) sowie Sturmauge, Blutmondzinne, Wandelgang (A). Die
+  Türen tragen Basiswerte auf E-Niveau, `skaliereTueren(rank, tueren)`
+  rechnet sie auf den Rang hoch – für S denselben Weg nehmen.
+  Ab Rang B fallen aufgewertete C-Items in der jeweils passenden Rarität
+  (legendär bei B, heroisch bei A), weil es eigene Stücke dieser Ränge
+  noch nicht gibt (siehe ITEMS). Sobald die da sind, gehören sie als Drops
+  eingetragen.
 - **Event-Dungeons.** Zeitlich begrenzt verfügbar, eigener Gegner, eigene
   Beute.
 - **Monats-Boss.** Einmal im Monat, deutlich stärker als ein normaler
