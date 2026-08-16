@@ -32,6 +32,7 @@ import {
   blockChanceDetail,
   berechneSchaden,
   gegnerSchaden,
+  TREFFER_DECKEL,
   moodIndex,
   phasenIndex,
   phasenText,
@@ -177,6 +178,11 @@ function DungeonFight({ onExit, daily = false }) {
     aura: state.aura,
     effekte,
   })
+  // Obergrenze eines einzelnen Treffers, wie sie gegnerSchaden anwendet
+  const deckelWert = Math.max(
+    1,
+    Math.round((k.maxVit ?? maxVit) * TREFFER_DECKEL),
+  )
   const kampfVorbei = !!popup || !!k.beendet
   const auraStufe = auraStage(state.aura, state.level)
   const mi = moodIndex(k.enemyHp, k.enemyMaxHp)
@@ -208,7 +214,12 @@ function DungeonFight({ onExit, daily = false }) {
     timers.current.push(setTimeout(() => setSlam(false), 600))
 
     const block = neu.block === 'offen' ? null : neu.block
-    const dmg = gegnerSchaden({ gegner: tuer, lebende: neu.lebende, block })
+    const { schaden: dmg, gedeckelt } = gegnerSchaden({
+      gegner: tuer,
+      lebende: neu.lebende,
+      block,
+      maxVit: neu.maxVit ?? maxVit,
+    })
     neu.vitalitaet = Math.max(0, neu.vitalitaet - dmg)
     fliegen(`-${dmg}`, '', false)
 
@@ -223,6 +234,14 @@ function DungeonFight({ onExit, daily = false }) {
       'bad',
       neu,
     )
+    // Deckelung sichtbar machen, sonst wirkt der Schaden willkürlich niedrig
+    if (gedeckelt) {
+      neu.log = nachricht(
+        `Abgefangen: höchstens ${Math.round(TREFFER_DECKEL * 100)}% Vitalität pro Treffer.`,
+        'sys',
+        neu,
+      )
+    }
     neu.block = 'offen'
 
     // Bosse belegen dich gelegentlich mit einem Fluch
@@ -861,6 +880,14 @@ function DungeonFight({ onExit, daily = false }) {
               Blockchance <span style={{ color: 'var(--glow)' }}>{blockDetail.gesamt}%</span> ·
               Heilungen: <span style={{ color: 'var(--xp)' }}>{k.heilungen}</span> ·
               Einschüchterung: <span style={{ color: 'var(--xp)' }}>+{auraBonus}%</span>
+            </p>
+            <p style={{ fontSize: '12px', color: 'var(--dim)', marginTop: 4 }}>
+              Ein einzelner Treffer nimmt höchstens{' '}
+              <span style={{ color: 'var(--warn)' }}>
+                {Math.round(TREFFER_DECKEL * 100)}%
+              </span>{' '}
+              deiner Vitalität – höchstens {deckelWert} von{' '}
+              {k.maxVit ?? maxVit}.
             </p>
             <p style={{ ...orbitron, fontSize: '10px', color: 'var(--dim)', marginTop: 3 }}>
               Basis {blockDetail.basis}% · Aura{' '}

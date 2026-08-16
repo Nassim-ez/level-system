@@ -1,7 +1,7 @@
 # SYSTEM – Roadmap
 
 Offener Stand und die Regeln, die bei jeder weiteren Arbeit gelten.
-Letzte Aktualisierung: 11.08.2026
+Letzte Aktualisierung: 12.08.2026
 
 ---
 
@@ -114,6 +114,15 @@ Raritätsstufen nicht mehr unterscheidbar.
 Die Kampfansicht muss ohne Scrollen auf einen Bildschirm passen (100dvh).
 Geprüft wird auf 320, 375 und 430 Pixel Breite. Neue Elemente dürfen diese
 Höhe nicht sprengen.
+
+### Deckelung einzelner Treffer
+
+Ein einzelner Gegnerangriff nimmt höchstens 70 Prozent der wirksamen
+Maximal-Vitalität (`TREFFER_DECKEL` in `src/data/combat.js`). Damit bleibt
+nach jedem Treffer eine Reaktion möglich und die Vorankündigung behält
+ihren Sinn – ohne die Deckelung töten die Bosse ab Rang A aus voller
+Vitalität. Die Grenze gilt für alle Gegner, auch im Tages-Dungeon, und
+wird im Kampflog sowie im INFO-Fenster ausgewiesen.
 
 ### Belastungssystem
 

@@ -75,6 +75,11 @@ export const BELASTUNG_HEILEN = 6
 export const BLOCK_ERFOLG_SCHADEN = 0.3
 export const BLOCK_BRUCH_SCHADEN = 0.85
 
+// Ein einzelner Treffer nimmt höchstens diesen Anteil der Maximal-Vitalität.
+// Damit bleibt nach jedem Angriff eine Reaktion möglich und die Ankündigung
+// behält ihren Sinn – sonst könnte ein Boss aus voller Vitalität töten.
+export const TREFFER_DECKEL = 0.7
+
 // Blockchance: Basiswert des Gegners plus Aura und Level-Vorsprung
 export const LEVEL_PRO_STUFE = 1.5
 export const LEVEL_GRENZE = 15
@@ -237,11 +242,23 @@ export function heilMenge(anteil, maxVit, effekte) {
 /**
  * Schaden eines Gegnerangriffs.
  * block: null (nicht geblockt) | 'gehalten' | 'gebrochen'
+ * maxVit: wirksame Maximal-Vitalität für die Deckelung
+ *
+ * Gibt { schaden, gedeckelt } zurück – gedeckelt sagt, ob TREFFER_DECKEL
+ * gegriffen hat, damit das Kampflog es kenntlich machen kann.
  */
-export function gegnerSchaden({ gegner, lebende = 1, block = null, rng = Math.random }) {
+export function gegnerSchaden({
+  gegner,
+  lebende = 1,
+  block = null,
+  maxVit = MAX_VITALITAET,
+  rng = Math.random,
+}) {
   let dmg = gegner.schaden + Math.round(rng() * 4)
   if (lebende > 1) dmg = Math.round(dmg * (1 + (lebende - 1) * GRUPPEN_BONUS))
   if (block === 'gehalten') dmg = Math.round(dmg * BLOCK_ERFOLG_SCHADEN)
   else if (block === 'gebrochen') dmg = Math.round(dmg * BLOCK_BRUCH_SCHADEN)
-  return Math.max(1, dmg)
+  dmg = Math.max(1, dmg)
+  const deckel = Math.max(1, Math.round(maxVit * TREFFER_DECKEL))
+  return { schaden: Math.min(dmg, deckel), gedeckelt: dmg > deckel }
 }
