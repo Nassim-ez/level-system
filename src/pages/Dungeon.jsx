@@ -9,6 +9,7 @@ import {
 } from '../data/dungeons.js'
 import DungeonFight from './DungeonFight.jsx'
 import { ITEMS, MATERIALIEN, raritaet } from '../data/items.js'
+import { zieheTresor } from '../data/loot.js'
 import SlotIcon from '../components/SlotIcons.jsx'
 import { todayKey } from '../data/quests.js'
 import {
@@ -258,6 +259,155 @@ function VerloreneAusruestung({ lostItems }) {
         zurück.
       </p>
     </Panel>
+  )
+}
+
+/* --------------------------------------------------------------------- */
+/* Tresor-Raum – die Verwendung der Dungeon-Schlüssel                      */
+/* --------------------------------------------------------------------- */
+function TresorRaum({ state, dispatch }) {
+  const [beute, setBeute] = useState(null)
+  const schluessel = state.inventory.filter(
+    (id) => id === 'dungeonschluessel',
+  ).length
+  const offen = state.tresor?.offen === true
+  // Ohne Schlüssel gibt es nichts anzuzeigen
+  if (schluessel === 0) return null
+
+  const oeffnen = () => {
+    // Zwei Klicks in derselben Runde würden sonst zweimal ziehen, obwohl
+    // der Reducer den zweiten Griff längst abweist
+    if (!offen || beute) return
+    const drops = zieheTresor(state.tresor.dungeonId, state.rank)
+    dispatch({ type: 'OPEN_TRESOR', drops })
+    setBeute(drops)
+  }
+
+  return (
+    <>
+      <Panel title="TRESOR-RAUM" accent={offen ? 'var(--xp)' : 'var(--dim)'}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p style={{ fontSize: '13px', lineHeight: 1.5 }}>
+              {offen
+                ? 'Hinter dem gefallenen Boss steht eine Tür offen. Kein Gegner, nur eine Truhe.'
+                : 'Verschlossen. Erst ein Bosssieg legt einen Tresor-Raum frei.'}
+            </p>
+            <p
+              className="mt-1"
+              style={{ ...orbitron, fontSize: '10px', letterSpacing: '1px', color: 'var(--dim)' }}
+            >
+              {schluessel} × DUNGEON-SCHLÜSSEL
+            </p>
+          </div>
+          <span className="shrink-0" style={{ fontSize: 26, opacity: offen ? 1 : 0.35 }}>
+            🗝️
+          </span>
+        </div>
+        {offen && (
+          <button
+            type="button"
+            onClick={oeffnen}
+            className="mt-3 w-full bg-transparent px-4 py-2.5"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--xp)',
+              border: '1px solid var(--xp)',
+              borderRadius: '10px',
+            }}
+          >
+            TRESOR ÖFFNEN · 1 SCHLÜSSEL
+          </button>
+        )}
+        <p className="mt-2" style={{ fontSize: '11px', color: 'var(--dim)', lineHeight: 1.5 }}>
+          Garantierte Beute: ein Stück eine Raritätsstufe über deinem Rang.
+          Auf Rang S gibt es das nicht mehr – dann ein Stück deines Rangs und
+          ein Materialbündel dazu.
+        </p>
+      </Panel>
+
+      {beute && (
+        <div
+          className="fixed inset-0 z-[60] grid place-items-center p-[22px]"
+          style={{ background: 'rgba(3,5,10,.9)', backdropFilter: 'blur(3px)' }}
+        >
+          <div
+            className="w-full max-w-[340px] rounded-2xl p-[22px] text-center"
+            style={{
+              background: 'var(--panel)',
+              border: '1px solid var(--xp)',
+              boxShadow: '0 0 40px rgba(143,224,255,.35)',
+            }}
+          >
+            <div style={{ fontSize: 36 }}>🗝️</div>
+            <h2
+              style={{
+                ...orbitron,
+                fontSize: '15px',
+                letterSpacing: '3px',
+                color: 'var(--xp)',
+                margin: '6px 0 10px',
+              }}
+            >
+              TRESOR GEÖFFNET
+            </h2>
+            <p style={{ color: 'var(--dim)', fontSize: '13.5px', lineHeight: 1.6 }}>
+              Der Schlüssel bleibt im Schloss zurück. Was in der Truhe lag,
+              gehört jetzt dir.
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              {beute.map((drop, i) => {
+                if (drop.art === 'material') {
+                  const m = MATERIALIEN[drop.material]
+                  return (
+                    <div key={i} className="border px-2 py-1.5" style={{ borderColor: m.color, borderRadius: 8 }}>
+                      <p style={{ fontSize: '13px', color: m.color }}>
+                        {m.name} ×{drop.menge}
+                      </p>
+                    </div>
+                  )
+                }
+                const item = ITEMS[drop.itemId]
+                const farbe = raritaet(item)?.color ?? 'var(--glow)'
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      border: `1px solid ${farbe}`,
+                      borderRadius: 8,
+                      padding: '6px 8px',
+                      boxShadow: `0 0 18px ${farbe}`,
+                    }}
+                  >
+                    <p style={{ fontSize: '13px', color: farbe }}>
+                      {item.name}{' '}
+                      <span style={{ fontSize: '10px' }}>{raritaet(item)?.name}</span>
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setBeute(null)}
+              className="mt-4 w-full bg-transparent px-4 py-2.5"
+              style={{
+                ...orbitron,
+                fontSize: '11px',
+                letterSpacing: '2px',
+                color: 'var(--glow)',
+                border: '1px solid var(--glow)',
+                borderRadius: '10px',
+              }}
+            >
+              MITNEHMEN
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -653,6 +803,9 @@ function Dungeon() {
       <div className="flex flex-col gap-4">
         {!state.dungeon.inside && (
           <TagesDungeon state={state} onStart={() => setImTageslauf(true)} />
+        )}
+        {!state.dungeon.inside && (
+          <TresorRaum state={state} dispatch={dispatch} />
         )}
         {(state.lostItems?.length ?? 0) > 0 && (
           <VerloreneAusruestung lostItems={state.lostItems} />

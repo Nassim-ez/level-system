@@ -277,7 +277,22 @@ function baueItems() {
     rar: null,
     verbrauchbar: true,
     beschreibung:
-      'Belohnung für sieben Tage Tages-Dungeon in Folge. Öffnet verschlossene Wege.',
+      'Belohnung für sieben Tage Tages-Dungeon in Folge. Schließt den Tresor-Raum auf, der nach einem Bosssieg offensteht.',
+    effects: {},
+  }
+  items.xp_boost = {
+    id: 'xp_boost',
+    basisId: 'xp_boost',
+    stufen: 0,
+    name: 'Konzentrat der Erfahrung',
+    basisName: 'Konzentrat der Erfahrung',
+    slot: null,
+    material: 'schatten',
+    rar: null,
+    verbrauchbar: true,
+    aktivierbar: true,
+    beschreibung:
+      'Doppelte XP für 24 Stunden, ab dem Schluck. Die Zeit läuft weiter, ob du trainierst oder nicht.',
     effects: {},
   }
   items.serienschutz = {

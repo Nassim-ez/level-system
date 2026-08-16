@@ -14,6 +14,8 @@ import {
   raritaet,
 } from '../data/items.js'
 import { SETS, SET_LISTE, MAX_SET_TEILE, stufeErreicht } from '../data/sets.js'
+import { SKILL_LISTE, SKILL_MAX, skillStufe, skillWert } from '../data/skills.js'
+import { BOOST_FAKTOR, BOOST_STUNDEN, boostAktiv, boostRestText } from '../data/boost.js'
 import Haendler from './Haendler.jsx'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
@@ -452,11 +454,163 @@ function ItemZeile({ item, slot, beschaedigt, angelegt, onAction }) {
 }
 
 /* --------------------------------------------------------------------- */
+/* Skill-Upgrades – dauerhaft, gestapelt bis SKILL_MAX                     */
+/* --------------------------------------------------------------------- */
+function SkillPanel({ skills }) {
+  return (
+    <Panel title="SKILL-UPGRADES">
+      <div className="flex flex-col gap-2">
+        {SKILL_LISTE.map((skill) => {
+          const stufe = skillStufe(skills, skill.id)
+          const wert = skillWert(skills, skill.id)
+          const voll = stufe >= SKILL_MAX
+          const aktiv = stufe > 0
+          return (
+            <div
+              key={skill.id}
+              className="border p-3"
+              style={{
+                borderColor: aktiv ? 'var(--xp)' : 'var(--line)',
+                borderRadius: 12,
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p
+                  className="text-[14px] font-semibold"
+                  style={{ color: aktiv ? 'var(--xp)' : 'var(--dim)' }}
+                >
+                  {skill.name}
+                </p>
+                <div className="flex shrink-0 items-center gap-1">
+                  {Array.from({ length: SKILL_MAX }, (_, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        width: 9,
+                        height: 9,
+                        borderRadius: 3,
+                        background: i < stufe ? 'var(--xp)' : 'transparent',
+                        border: `1px solid ${i < stufe ? 'var(--xp)' : 'var(--line)'}`,
+                        boxShadow: i < stufe ? '0 0 8px rgba(143,224,255,.8)' : 'none',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <p className="mt-1" style={{ fontSize: '11.5px', color: 'var(--dim)', lineHeight: 1.45 }}>
+                {skill.beschreibung}
+              </p>
+              <p
+                className="mt-1"
+                style={{ ...orbitron, fontSize: '10px', letterSpacing: '1px', color: aktiv ? 'var(--xp)' : 'var(--dim)' }}
+              >
+                {aktiv
+                  ? `STUFE ${stufe}/${SKILL_MAX} · ${wert > 0 ? '+' : ''}${wert} ${skill.einheit.toUpperCase()}`
+                  : `STUFE 0/${SKILL_MAX} · NOCH KEINE`}
+                {voll && ' · AUSGEREIZT'}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-3" style={{ fontSize: '11px', color: 'var(--dim)', lineHeight: 1.5 }}>
+        Skill-Upgrades fallen selten aus Boss-Kämpfen und wirken sofort. Sie
+        lassen sich weder kaufen noch verlieren.
+      </p>
+    </Panel>
+  )
+}
+
+/* --------------------------------------------------------------------- */
+function BoostBestaetigung({ laeuft, restText, onAbbruch, onTrinken }) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center p-[22px]"
+      style={{ background: 'rgba(3,5,10,.9)', backdropFilter: 'blur(3px)' }}
+    >
+      <div
+        className="w-full max-w-[340px] rounded-2xl p-[22px] text-center"
+        style={{
+          background: 'var(--panel)',
+          border: '1px solid var(--xp)',
+          boxShadow: '0 0 40px rgba(143,224,255,.35)',
+        }}
+      >
+        <div style={{ fontSize: 36 }}>⏳</div>
+        <h2
+          style={{
+            ...orbitron,
+            fontSize: '15px',
+            letterSpacing: '3px',
+            color: 'var(--xp)',
+            margin: '6px 0 10px',
+          }}
+        >
+          KONZENTRAT TRINKEN?
+        </h2>
+        <p style={{ color: 'var(--dim)', fontSize: '13.5px', lineHeight: 1.6 }}>
+          Ab dem Schluck zählt jede XP doppelt – {BOOST_STUNDEN} Stunden lang,
+          ob du trainierst oder nicht.
+        </p>
+        {laeuft && (
+          <p
+            className="mt-3 border px-3 py-2"
+            style={{
+              fontSize: '12.5px',
+              lineHeight: 1.5,
+              color: 'var(--warn)',
+              borderColor: 'var(--warn)',
+              borderRadius: 10,
+            }}
+          >
+            Es läuft noch ein Boost über {restText}. Ein zweiter verlängert
+            ihn nicht, sondern setzt die Zeit neu an.
+          </p>
+        )}
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={onAbbruch}
+            className="flex-1 bg-transparent px-4 py-2.5"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--dim)',
+              border: '1px solid var(--line)',
+              borderRadius: '10px',
+            }}
+          >
+            ABBRECHEN
+          </button>
+          <button
+            type="button"
+            onClick={onTrinken}
+            className="flex-1 bg-transparent px-4 py-2.5"
+            style={{
+              ...orbitron,
+              fontSize: '11px',
+              letterSpacing: '2px',
+              color: 'var(--xp)',
+              border: '1px solid var(--xp)',
+              borderRadius: '10px',
+            }}
+          >
+            ×{BOOST_FAKTOR} XP
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* --------------------------------------------------------------------- */
 function Charakter() {
   const { state, dispatch } = useGame()
   const [slot, setSlot] = useState('waffe')
   const [blitz, setBlitz] = useState(null)
   const [beimHaendler, setBeimHaendler] = useState(false)
+  const [boostFrage, setBoostFrage] = useState(false)
   const timer = useRef(null)
 
   useEffect(() => () => clearTimeout(timer.current), [])
@@ -468,6 +622,7 @@ function Charakter() {
   const verbrauch = state.inventory
     .map((id, i) => ({ id, i, item: ITEMS[id] }))
     .filter((e) => e.item && e.item.slot == null)
+  const boostLaeuft = boostAktiv(state.xpBoost)
 
   const anlegen = (itemId) => {
     dispatch({ type: 'EQUIP_ITEM', itemId })
@@ -568,6 +723,8 @@ function Charakter() {
         </button>
       </Panel>
 
+      <SkillPanel skills={state.skills} />
+
       {verbrauch.length > 0 && (
         <Panel title="BEUTEL">
           <div className="flex flex-col gap-2">
@@ -581,17 +738,56 @@ function Charakter() {
                   ◆
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[14px] font-semibold">
+                  {/* Kein truncate: neben dem Knopf bleibt zu wenig Breite */}
+                  <p className="text-[14px] font-semibold leading-tight">
                     {item.name}
                   </p>
-                  <p style={{ fontSize: '11px', color: 'var(--dim)' }}>
+                  <p
+                    className="mt-0.5"
+                    style={{ fontSize: '11px', color: 'var(--dim)', lineHeight: 1.45 }}
+                  >
                     {item.beschreibung}
                   </p>
                 </div>
+                {/* Nur was sich benutzen lässt, bekommt einen Knopf */}
+                {item.aktivierbar && (
+                  <button
+                    type="button"
+                    onClick={() => setBoostFrage(true)}
+                    className="shrink-0 bg-transparent px-3 py-1.5"
+                    style={{
+                      ...orbitron,
+                      fontSize: 9,
+                      letterSpacing: '1px',
+                      color: 'var(--xp)',
+                      border: '1px solid var(--xp)',
+                      borderRadius: 9,
+                    }}
+                  >
+                    BENUTZEN
+                  </button>
+                )}
               </div>
             ))}
           </div>
+          {boostLaeuft && (
+            <p className="mt-3" style={{ fontSize: '11.5px', color: 'var(--xp)' }}>
+              Ein Boost läuft noch {boostRestText(state.xpBoost)}.
+            </p>
+          )}
         </Panel>
+      )}
+
+      {boostFrage && (
+        <BoostBestaetigung
+          laeuft={boostLaeuft}
+          restText={boostRestText(state.xpBoost)}
+          onAbbruch={() => setBoostFrage(false)}
+          onTrinken={() => {
+            dispatch({ type: 'USE_XP_BOOST' })
+            setBoostFrage(false)
+          }}
+        />
       )}
     </div>
   )

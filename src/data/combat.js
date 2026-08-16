@@ -100,15 +100,19 @@ export function blockChanceDetail(gegner, spieler) {
   const level = Math.round(
     Math.max(-LEVEL_GRENZE, Math.min(LEVEL_GRENZE, roh)),
   )
-  // Ausrüstung wirkt in Prozentpunkten auf die Blockchance
-  const ausruestung = spieler?.effekte?.block ?? 0
-  const summe = basis + aura + level + ausruestung
+  // Ausrüstung wirkt in Prozentpunkten auf die Blockchance. Skills nutzen
+  // denselben Schlüssel und stecken deshalb schon in effekte.block – für
+  // die Aufschlüsselung werden sie wieder herausgerechnet.
+  const skills = spieler?.skillBlock ?? 0
+  const ausruestung = (spieler?.effekte?.block ?? 0) - skills
+  const summe = basis + aura + level + ausruestung + skills
   const gesamt = Math.max(BLOCK_MIN * 100, Math.min(BLOCK_MAX * 100, summe))
   return {
     basis: Math.round(basis),
     aura,
     level: Math.round(level),
     ausruestung: Math.round(ausruestung),
+    skills: Math.round(skills),
     gesamt: Math.round(gesamt),
     chance: gesamt / 100,
   }

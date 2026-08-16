@@ -9,7 +9,8 @@ import {
   raritaet,
   summiereEffekte,
 } from '../data/items.js'
-import { zieheDrops } from '../data/loot.js'
+import { zieheDrops, zieheBoost, zieheSkill } from '../data/loot.js'
+import { SKILLS, SKILL_MAX, skillEffekte, extraHeilungen } from '../data/skills.js'
 import {
   serienFaktor,
   MAT_PRO_TUER,
@@ -56,13 +57,13 @@ const STAUB = [
   { left: '86%', dauer: 9.8, delay: 5.2, farbe: 'rgba(255,107,120,.35)' },
 ]
 
-function neuerKampf(tuer, maxVit = MAX_VITALITAET) {
+function neuerKampf(tuer, maxVit = MAX_VITALITAET, heilungen = MAX_HEILUNGEN) {
   return {
     nr: tuer.nr,
     maxVit,
     vitalitaet: maxVit,
     belastung: 0,
-    heilungen: MAX_HEILUNGEN,
+    heilungen,
     enemyHp: tuer.hp,
     enemyMaxHp: tuer.hp,
     lebende: tuer.anzahl,
@@ -110,10 +111,17 @@ function DungeonFight({ onExit, daily = false }) {
     : dungeon?.tueren.find((t) => t.nr === state.dungeon.door)
   const gespeichert = daily ? state.daily.fight : state.dungeon.fight
 
+  // Skills nutzen dieselben Effektschlüssel wie die Ausrüstung und wirken
+  // dadurch überall dort mit, wo auch die Item-Effekte greifen
+  const skillPlus = skillEffekte(state.skills)
   const effekte = summiereEffekte(state.equipment)
+  for (const [key, wert] of Object.entries(skillPlus)) {
+    effekte[key] = (effekte[key] ?? 0) + wert
+  }
   const maxVit = maxVitalitaet(effekte)
+  const maxHeilungen = MAX_HEILUNGEN + extraHeilungen(state.skills)
   const [k, setK] = useState(
-    () => gespeichert ?? (tuer ? neuerKampf(tuer, maxVit) : null),
+    () => gespeichert ?? (tuer ? neuerKampf(tuer, maxVit, maxHeilungen) : null),
   )
   const [pAnim, setPAnim] = useState('')
   const [eAnim, setEAnim] = useState('')
@@ -138,14 +146,14 @@ function DungeonFight({ onExit, daily = false }) {
         maxVit,
         vitalitaet: maxVit,
         belastung: 0,
-        heilungen: MAX_HEILUNGEN,
+        heilungen: maxHeilungen,
         block: 'offen',
         zug: 0,
         fluch: 0,
         log: ['Du hast gerastet. Der Gegner hat sich erholt.'],
       }))
     }
-  }, [k?.gerastet, maxVit])
+  }, [k?.gerastet, maxVit, maxHeilungen])
 
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
 
@@ -177,6 +185,7 @@ function DungeonFight({ onExit, daily = false }) {
     level: state.level,
     aura: state.aura,
     effekte,
+    skillBlock: skillPlus.block ?? 0,
   })
   // Obergrenze eines einzelnen Treffers, wie sie gegnerSchaden anwendet
   const deckelWert = Math.max(
@@ -352,6 +361,13 @@ function DungeonFight({ onExit, daily = false }) {
               },
             ]
           : zieheDrops(dungeon.id, state.rank, tuer.boss ? 2 : 1, Math.random, effekte)
+        // Seltene Zusatzbeute: Boosts hinter jeder Tür, Skills nur vom Boss
+        if (!daily) {
+          const extra = tuer.boss
+            ? zieheSkill(state.skills)
+            : zieheBoost()
+          if (extra) drops.push(extra)
+        }
         timers.current.push(setTimeout(() => setPopup({ art: 'sieg', drops }), 900))
         return neu
       }
@@ -900,13 +916,19 @@ function DungeonFight({ onExit, daily = false }) {
                   {' '}· Ausrüstung {blockDetail.ausruestung >= 0 ? '+' : ''}
                   {blockDetail.ausruestung}
                 </>
+              )}
+              {blockDetail.skills !== 0 && (
+                <>
+                  {' '}· Skills +{blockDetail.skills}
+                </>
               )}{' '}
               ={' '}
               <span style={{ color: 'var(--glow)' }}>{blockDetail.gesamt}%</span>
               {blockDetail.basis +
                 blockDetail.aura +
                 blockDetail.level +
-                blockDetail.ausruestung !==
+                blockDetail.ausruestung +
+                blockDetail.skills !==
                 blockDetail.gesamt && ' (Grenze)'}
             </p>
             <b style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px', color: 'var(--dim)', display: 'block', marginTop: 12 }}>
@@ -1024,6 +1046,36 @@ function DungeonFight({ onExit, daily = false }) {
             {popup.art === 'sieg' && (
               <div className="mt-3 flex flex-col gap-2">
                 {popup.drops?.map((drop, i) => {
+                  if (drop.art === 'skill') {
+                    const skill = SKILLS[drop.skill]
+                    // Der Reducer zählt erst beim Bestätigen hoch – hier
+                    // steht schon die Stufe, die der Fund bringt
+                    const stufe = Math.min(
+                      SKILL_MAX,
+                      (state.skills?.[drop.skill] ?? 0) + 1,
+                    )
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          border: '1px solid var(--xp)',
+                          borderRadius: 8,
+                          padding: '6px 8px',
+                          boxShadow: '0 0 18px rgba(143,224,255,.45)',
+                        }}
+                      >
+                        <p style={{ ...orbitron, fontSize: '9px', letterSpacing: '1px', color: 'var(--xp)' }}>
+                          ✦ SKILL-UPGRADE ✦
+                        </p>
+                        <p style={{ fontSize: '13px', color: 'var(--xp)' }}>
+                          {skill.name} · Stufe {stufe}
+                        </p>
+                        <p style={{ fontSize: '11px', color: 'var(--dim)', lineHeight: 1.4 }}>
+                          {skill.beschreibung}
+                        </p>
+                      </div>
+                    )
+                  }
                   if (drop.art === 'material') {
                     const m = MATERIALIEN[drop.material]
                     return (

@@ -41,7 +41,9 @@ import {
   raritaet,
   summiereEffekte,
 } from '../data/items.js'
-import { zieheDrops, materialName } from '../data/loot.js'
+import { zieheDrops, zieheTresor, materialName } from '../data/loot.js'
+import { LEERE_SKILLS, SKILLS, SKILL_MAX, skillStufe } from '../data/skills.js'
+import { BOOST_FAKTOR, boostAktiv, boostEnde, BOOST_STUNDEN } from '../data/boost.js'
 import {
   RANK_THRESHOLDS,
   RANK_TESTS,
@@ -121,6 +123,12 @@ const initialState = {
   varianten: {},
   // Beim letzten Rangaufstieg gewechselte Stufen, bis das Popup sie zeigt
   stufenWechsel: [],
+  // Dauerhafte Kampfverbesserungen, je Linie bis SKILL_MAX
+  skills: { ...LEERE_SKILLS },
+  // Ablaufzeitpunkt des XP-Boosts, null = keiner aktiv
+  xpBoost: null,
+  // Nach einem Bosssieg offener Tresor-Raum, zu öffnen mit einem Schlüssel
+  tresor: { offen: false, dungeonId: null },
   // Der Nachtherr auf dem Hohlen Thron ist gefallen – Ende der Rangleiter
   thronBezwungen: false,
   // Abschlussmeldung, bis das Popup sie gezeigt hat
@@ -144,6 +152,8 @@ function verteileBeute(state, drops) {
   let materials = { ...state.materials }
   let log = state.log
   for (const drop of drops ?? []) {
+    // Skill-Upgrades wirken direkt und liegen nie im Inventar
+    if (drop.art === 'skill') continue
     if (drop.art === 'material') {
       materials[drop.material] = (materials[drop.material] ?? 0) + drop.menge
       log = withLog(log, `${materialName(drop.material)} ×${drop.menge}`, {
@@ -160,6 +170,27 @@ function verteileBeute(state, drops) {
     }
   }
   return { inventory, materials, log }
+}
+
+/**
+ * Wendet Skill-Upgrades aus der Beute sofort an. Sie liegen nie im
+ * Inventar, deshalb wandern sie hier direkt in den Zustand.
+ */
+function wendeSkillsAn(skills, log, drops) {
+  let neu = skills
+  let ausgabe = log
+  for (const drop of drops ?? []) {
+    if (drop.art !== 'skill') continue
+    const skill = SKILLS[drop.skill]
+    if (!skill) continue
+    const stufe = skillStufe(neu, skill.id)
+    if (stufe >= SKILL_MAX) continue
+    neu = { ...neu, [skill.id]: stufe + 1 }
+    ausgabe = withLog(ausgabe, `Skill „${skill.name}" auf Stufe ${stufe + 1}`, {
+      detail: skill.beschreibung,
+    })
+  }
+  return { skills: neu, log: ausgabe }
 }
 
 /**
@@ -191,13 +222,15 @@ function withLog(log, text, extra = {}) {
 // Der XP-Aufschlag haengt am Trainingssystem und gilt fuer die Kategorien,
 // auf die es sich konzentriert. Eine leere Liste heisst: auf alles.
 function xpMultiplier(state, kategorie) {
-  if (!state.system) return 1
+  // Der Boost verdoppelt, was nach dem Systemaufschlag übrig bleibt
+  const boost = boostAktiv(state.xpBoost) ? BOOST_FAKTOR : 1
+  if (!state.system) return boost
   const bonus = systemOder(state.system).bonus
-  if (!bonus) return 1
+  if (!bonus) return boost
   const trifft =
     bonus.kategorien.length === 0 ||
     (kategorie && bonus.kategorien.includes(kategorie))
-  return trifft ? 1 + bonus.wert / 100 : 1
+  return (trifft ? 1 + bonus.wert / 100 : 1) * boost
 }
 
 function unlockTitles(state) {
@@ -557,6 +590,40 @@ function reducer(state, action) {
       if (!state.stufenWechsel?.length) return state
       return { ...state, stufenWechsel: [] }
     }
+    case 'USE_XP_BOOST': {
+      const idx = state.inventory.indexOf('xp_boost')
+      if (idx < 0) return state
+      const inventory = [...state.inventory]
+      inventory.splice(idx, 1)
+      return {
+        ...state,
+        inventory,
+        xpBoost: boostEnde(),
+        log: withLog(state.log, 'Konzentrat der Erfahrung getrunken', {
+          detail: `Doppelte XP für ${BOOST_STUNDEN} Stunden`,
+        }),
+      }
+    }
+    case 'OPEN_TRESOR': {
+      // Nur mit offenem Tresor und einem Schlüssel im Beutel
+      if (!state.tresor?.offen) return state
+      const idx = state.inventory.indexOf('dungeonschluessel')
+      if (idx < 0) return state
+      const drops =
+        action.drops ?? zieheTresor(state.tresor.dungeonId, state.rank)
+      const ohneSchluessel = [...state.inventory]
+      ohneSchluessel.splice(idx, 1)
+      const beute = verteileBeute({ ...state, inventory: ohneSchluessel }, drops)
+      return {
+        ...state,
+        inventory: beute.inventory,
+        materials: beute.materials,
+        tresor: { offen: false, dungeonId: null },
+        log: withLog(beute.log, 'Tresor-Raum geöffnet', {
+          detail: 'Ein Dungeon-Schlüssel verbraucht',
+        }),
+      }
+    }
     case 'CLEAR_ABSCHLUSS': {
       if (!state.abschluss) return state
       return { ...state, abschluss: null }
@@ -654,8 +721,10 @@ function reducer(state, action) {
         : beute.log
 
       if (!tuer.boss) {
+        const tuerSkill = wendeSkillsAn(state.skills, beuteLog, drops)
         let next = {
           ...state,
+          skills: tuerSkill.skills,
           inventory,
           damagedItems,
           lostItems,
@@ -668,7 +737,7 @@ function reducer(state, action) {
             enemyHp: null,
             fight: null,
           },
-          log: withLog(beuteLog, `Tür ${tuer.nr} geschafft`, {
+          log: withLog(tuerSkill.log, `Tür ${tuer.nr} geschafft`, {
             detail: `${tuer.name} · ${tuer.anzahl}× ${tuer.gegnerart}`,
             xp: TUER_XP,
           }),
@@ -677,12 +746,20 @@ function reducer(state, action) {
         return next
       }
       // Bosssieg: Tor öffnet sich, doppelte Beute und XP
-      const log = withLog(beuteLog, `${dungeon.boss} besiegt`, {
+      const bossSkill = wendeSkillsAn(state.skills, beuteLog, drops)
+      let log = withLog(bossSkill.log, `${dungeon.boss} besiegt`, {
         detail: `${dungeon.name} abgeschlossen`,
         xp: BOSS_XP,
       })
+      // Hinter dem Boss liegt der Tresor. Er bleibt offen, bis ein
+      // Schlüssel ihn aufschließt – verfallen kann er nicht.
+      log = withLog(log, 'Ein Tresor-Raum steht offen', {
+        detail: 'Ein Dungeon-Schlüssel schließt ihn auf',
+      })
       let next = {
         ...state,
+        skills: bossSkill.skills,
+        tresor: { offen: true, dungeonId: dungeon.id },
         dungeon: {
           ...state.dungeon,
           run: null,
@@ -1248,6 +1325,13 @@ function migriereSpielstand(gespeichert) {
     },
     varianten: gespeichert.varianten ?? {},
     stufenWechsel: gespeichert.stufenWechsel ?? [],
+    skills: { ...LEERE_SKILLS, ...gespeichert.skills },
+    // Ein abgelaufener Boost wird beim Laden gleich weggeräumt
+    xpBoost: boostAktiv(gespeichert.xpBoost) ? gespeichert.xpBoost : null,
+    tresor: {
+      offen: gespeichert.tresor?.offen === true,
+      dungeonId: gespeichert.tresor?.dungeonId ?? null,
+    },
     thronBezwungen: gespeichert.thronBezwungen === true,
     abschluss: gespeichert.abschluss ?? null,
     gender: normalizeGender(gespeichert.gender),

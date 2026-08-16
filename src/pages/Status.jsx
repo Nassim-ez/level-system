@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Panel from '../components/Panel.jsx'
 import { useGame } from '../context/GameContext.jsx'
 import { CLASSES } from '../data/classes.js'
@@ -11,6 +11,12 @@ import {
 import { TITLES } from '../data/titles.js'
 import { anrede } from '../data/gender.js'
 import { auraQuote, auraStage } from '../data/aura.js'
+import {
+  BOOST_FAKTOR,
+  boostAktiv,
+  boostAnteil,
+  boostRestText,
+} from '../data/boost.js'
 
 const orbitron = { fontFamily: "'Orbitron', sans-serif" }
 
@@ -186,6 +192,8 @@ function Status() {
         </div>
       </Panel>
 
+      <BoostPanel />
+
       <Panel title="TAGESSERIE">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -219,6 +227,64 @@ function Status() {
       <TrainingssystemPanel />
       <GewichtPanel />
     </div>
+  )
+}
+
+/* --------------------------------------------------------------------- */
+/* Laufender XP-Boost – nur sichtbar, solange er wirkt                     */
+/* --------------------------------------------------------------------- */
+function BoostPanel() {
+  const { state } = useGame()
+  // Der Text wird aus dem Ablaufzeitpunkt gerechnet; ein Takt hält ihn frisch
+  const [, tick] = useState(0)
+  useEffect(() => {
+    if (!boostAktiv(state.xpBoost)) return undefined
+    const id = setInterval(() => tick((n) => n + 1), 30000)
+    return () => clearInterval(id)
+  }, [state.xpBoost])
+
+  if (!boostAktiv(state.xpBoost)) return null
+  const rest = boostRestText(state.xpBoost)
+  const anteil = boostAnteil(state.xpBoost)
+
+  return (
+    <Panel title="XP-BOOST" accent="var(--xp)">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p
+            style={{
+              ...orbitron,
+              fontSize: '22px',
+              color: 'var(--xp)',
+              textShadow: '0 0 12px rgba(143,224,255,.8)',
+            }}
+          >
+            ×{BOOST_FAKTOR} XP
+          </p>
+          <p className="uppercase" style={{ fontSize: '12px', color: 'var(--dim)' }}>
+            Noch {rest}
+          </p>
+        </div>
+        <span style={{ fontSize: 26 }}>⏳</span>
+      </div>
+      <div
+        className="mt-3 w-full overflow-hidden"
+        style={{ height: 8, borderRadius: 999, background: 'rgba(143,224,255,.12)' }}
+      >
+        <div
+          style={{
+            width: `${anteil * 100}%`,
+            height: '100%',
+            borderRadius: 999,
+            background: 'var(--xp)',
+            boxShadow: '0 0 10px rgba(143,224,255,.9)',
+          }}
+        />
+      </div>
+      <p className="mt-2" style={{ fontSize: '11.5px', color: 'var(--dim)' }}>
+        Gilt für jede XP-Quelle – Quests, Dungeons und den Tageslauf.
+      </p>
+    </Panel>
   )
 }
 

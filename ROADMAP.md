@@ -1,7 +1,7 @@
 # SYSTEM – Roadmap
 
 Offener Stand und die Regeln, die bei jeder weiteren Arbeit gelten.
-Letzte Aktualisierung: 13.08.2026
+Letzte Aktualisierung: 14.08.2026
 
 ---
 
@@ -46,10 +46,15 @@ Jede Schemaänderung braucht eine Migration in `migriereSpielstand`
   Beute.
 - **Monats-Boss.** Einmal im Monat, deutlich stärker als ein normaler
   Boss, hochwertige Beute.
-- **Verwendung für die Dungeon-Schlüssel.** Der Schlüssel wird nach sieben
-  Tagen Tages-Dungeon in Folge vergeben (`GameContext.jsx`), öffnet aber
-  bisher nichts.
-- **Neue Beutearten:** Skill-Upgrades und XP-Boosts ergänzen.
+- **Der Tresor-Raum ist die Verwendung der Dungeon-Schlüssel.** Nach jedem
+  Bosssieg steht er offen (`tresor` im Zustand) und bleibt es, bis ein
+  Schlüssel ihn aufschließt – verfallen kann er nicht. Kein Kampf, eine
+  Truhe: garantiert ein Stück eine Raritätsstufe über dem eigenen Rang, auf
+  Rang S stattdessen ein Stück des eigenen Rangs plus Materialbündel
+  (`zieheTresor` in `src/data/loot.js`). Angezeigt im Dungeon-Tab, sobald
+  Schlüssel im Beutel liegen.
+- **Event-Dungeons und Monats-Boss** sind die letzten offenen Beutequellen
+  (siehe oben).
 
 ## ITEMS
 
@@ -64,6 +69,23 @@ Jede Schemaänderung braucht eine Migration in `migriereSpielstand`
 - **Zweite Stücke je Slot und Rang.** Bisher gibt es pro Slot genau ein
   Stück je Rarität, die Wahl ist also nur eine Frage des Rangs. Alternativen
   mit anderem Effektprofil würden echte Entscheidungen bringen.
+
+## FORTSCHRITT NEBEN DEM RANG
+
+- **Skill-Upgrades** (`src/data/skills.js`): drei Linien – Blocken
+  (+5 Prozentpunkte Blockchance), Heilen (+1 Heilung je Kampf) und
+  Erholung (−10 Prozent Belastung), jede bis zu dreimal stapelbar. Sie
+  fallen selten aus Boss-Kämpfen, wirken sofort und lassen sich weder
+  kaufen noch verlieren. Blocken und Erholung nutzen dieselben
+  Effektschlüssel wie die Ausrüstung und fließen in dieselbe Summe;
+  Heilen setzt den Vorrat zu Kampfbeginn. Anzeige im Charakter-Tab.
+  Weitere Linien wären nachrüstbar – der Kampf hat noch Stellschrauben,
+  die keine Linie belegt (Combo, Fluchdauer, Rastwirkung).
+- **XP-Boost** (`src/data/boost.js`): Verbrauchsgegenstand im Beutel,
+  doppelte XP für 24 Stunden, mit Rückfrage aktivierbar. Er hängt an einem
+  Ablaufzeitpunkt statt an einer Restdauer, läuft also auch bei
+  geschlossener App korrekt ab. Restlaufzeit im Status-Tab. Fällt selten
+  hinter geräumten Türen.
 
 ## GRAFIK
 
