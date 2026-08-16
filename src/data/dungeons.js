@@ -1047,7 +1047,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ]),
-    drop: 'brus_c1+1',
+    drop: 'brus_b1',
   },
   {
     id: 'spiegelhallen',
@@ -1148,7 +1148,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ]),
-    drop: 'helm_c1+1',
+    drop: 'helm_b1',
   },
   {
     id: 'schlund',
@@ -1248,7 +1248,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ]),
-    drop: 'schu_c1+1',
+    drop: 'schu_b1',
   },
 
   // =========================================================================
@@ -1353,7 +1353,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ]),
-    drop: 'brus_c1+2',
+    drop: 'brus_a1',
   },
   {
     id: 'blutmondzinne',
@@ -1454,7 +1454,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ]),
-    drop: 'kett_c1+2',
+    drop: 'kett_a1',
   },
   {
     id: 'wandelgang',
@@ -1554,7 +1554,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ]),
-    drop: 'ring_c1+2',
+    drop: 'ring_a1',
   },
 
   // =========================================================================
@@ -1659,7 +1659,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ]),
-    drop: 'helm_c1+3',
+    drop: 'helm_s1',
   },
   {
     id: 'stillewiege',
@@ -1759,7 +1759,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ]),
-    drop: 'kett_c1+3',
+    drop: 'kett_s1',
   },
   {
     // -----------------------------------------------------------------------
@@ -1871,7 +1871,7 @@ export const DUNGEON_RUNS = [
         ],
       },
     ]),
-    drop: 'brus_c1+3',
+    drop: 'brus_s1',
   },
 ]
 

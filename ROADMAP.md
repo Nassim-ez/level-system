@@ -1,14 +1,14 @@
 # SYSTEM – Roadmap
 
 Offener Stand und die Regeln, die bei jeder weiteren Arbeit gelten.
-Letzte Aktualisierung: 12.08.2026
+Letzte Aktualisierung: 13.08.2026
 
 ---
 
 ## Wo das Projekt steht
 
 Spielbar sind E- bis S-Rang mit je drei Dungeons zu fünf Türen, dazu der
-Tages-Dungeon, das Item- und Set-System bis C-Rang, die
+Tages-Dungeon, das Item- und Set-System über alle Ränge, die
 Übungsdatenbank mit Variantenleiter, fünf Trainingssysteme, der
 Mobility-Ablauf, das Eiweiß-Tracking und die Sicherung des Spielstands als
 Datei.
@@ -34,10 +34,9 @@ Jede Schemaänderung braucht eine Migration in `migriereSpielstand`
   Rangrahmens (3150 HP) und vier Phasenwechsel mit eigenem Text. Nach
   seinem Sturz setzt der Reducer `thronBezwungen`, zeigt das
   Abschluss-Popup und schaltet den Titel „Bezwinger der Nacht" frei.
-  Ab Rang B fallen aufgewertete C-Items in der jeweils passenden Rarität
-  (legendär bei B, heroisch bei A, mystisch bei S), weil es eigene Stücke
-  dieser Ränge noch nicht gibt (siehe ITEMS). Sobald die da sind, gehören
-  sie als Drops eingetragen.
+  Jeder Rang hat eigene Beute: `zieheDrop` zieht das echte Stück der
+  Rang-Rarität, aufgewertete C-Stücke fallen nicht mehr. Der Loot-Pool
+  eines Dungeons ergibt sich aus den Materialien seiner Türen.
 - **Phasentexte für die bestehenden Bosse.** Seit dem S-Rang schreibt
   `DungeonFight.jsx` bei jedem Phasenwechsel einen Text ins Kampflog. Ohne
   eigenes `phasen`-Feld greift es auf `mood` zurück – die Texte aller
@@ -54,11 +53,17 @@ Jede Schemaänderung braucht eine Migration in `migriereSpielstand`
 
 ## ITEMS
 
-- **Items für B, A und S** nach dem Muster der bestehenden Datei
-  (`src/data/items.js`), jeweils drei pro Slot mit Buff und Debuff.
-  Der Katalog deckt derzeit die Basis-Raritäten 0 bis 2 ab (E, D, C) mit
-  24 Items, also drei je Slot. Höhere Raritäten entstehen bisher nur durch
-  Aufwerten beim Schmied, nicht als eigene Stücke.
+- **Der Katalog ist vollständig.** 48 Stücke in `src/data/items.js`, sechs
+  je Slot, eines pro Rarität von Gewöhnlich bis Mystisch. Ab Legendär trägt
+  jedes Stück genau einen Buff und einen Debuff; load- und dmgAll-Items
+  bleiben im Buff an der Untergrenze, weil sie breiter wirken.
+  Die Materialien verteilen sich je Rarität gleichmäßig auf zwei Stücke
+  pro Sorte. Ein Vierer-Set aus B/A/S-Teilen ist für jede Sorte möglich,
+  innerhalb eines einzelnen Rangs dagegen nicht – dafür müsste eine Sorte
+  vier der acht Slots belegen und eine andere leer ausgehen.
+- **Zweite Stücke je Slot und Rang.** Bisher gibt es pro Slot genau ein
+  Stück je Rarität, die Wahl ist also nur eine Frage des Rangs. Alternativen
+  mit anderem Effektprofil würden echte Entscheidungen bringen.
 
 ## GRAFIK
 

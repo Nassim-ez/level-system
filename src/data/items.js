@@ -59,7 +59,9 @@ export function materialFuerSprite(sprite) {
 }
 
 // ---------------------------------------------------------------------------
-// Item-Katalog bis C-Rang (24 Items, drei je Slot, Raritäten 0–2)
+// Item-Katalog über alle Ränge (48 Items, sechs je Slot, Raritäten 0–5)
+// Ab Legendär trägt jedes Stück einen Buff und einen Debuff; load- und
+// dmgAll-Items bleiben im Buff schwächer, weil sie breiter wirken.
 // Effekte in Prozent, negativ = Debuff:
 //   dmgKraft, dmgCore, dmgAusdauer, dmgTempo, dmgAll – Schaden je Angriffsart
 //   vit   – maximale Vitalität
@@ -132,6 +134,60 @@ export const KATALOG = [
     effects: { dmgTempo: 10, block: -5 } },
   { id: 'schu_c1', slot: 'schuhe', name: 'Pfoten des Rudels', rarity: 2, mat: 'wolf',
     effects: { dmgTempo: 14, dmgKraft: -6 } },
+
+  // ---- LEGENDÄR (Rang B) · Aschewüste, Spiegelhallen, Der Schlund --------
+  { id: 'helm_b1', slot: 'helm', name: 'Maske des Spiegelwächters', rarity: 3, mat: 'knochen',
+    effects: { vit: 18, dmgTempo: -8 } },
+  { id: 'kett_b1', slot: 'kette', name: 'Kadaverzahn-Amulett', rarity: 3, mat: 'wolf',
+    effects: { load: -17, dmgAll: -9 } },
+  { id: 'umha_b1', slot: 'umhang', name: 'Schleier des Zerrbilds', rarity: 3, mat: 'schatten',
+    effects: { luck: 19, block: -8 } },
+  { id: 'brus_b1', slot: 'brust', name: 'Kürass des Ödwächters', rarity: 3, mat: 'basalt',
+    effects: { block: 20, dmgTempo: -9 } },
+  { id: 'waff_b1', slot: 'waffe', name: 'Klinge des Glasgängers', rarity: 3, mat: 'basalt',
+    effects: { dmgKraft: 20, dmgCore: -9 } },
+  { id: 'ring_b1', slot: 'ring', name: 'Ring des Echofressers', rarity: 3, mat: 'schatten',
+    effects: { dmgCore: 19, dmgKraft: -8 } },
+  { id: 'hose_b1', slot: 'hose', name: 'Kadaverfell-Hose', rarity: 3, mat: 'wolf',
+    effects: { dmgAusdauer: 19, vit: -8 } },
+  { id: 'schu_b1', slot: 'schuhe', name: 'Schlundwurm-Stiefel', rarity: 3, mat: 'knochen',
+    effects: { dmgTempo: 20, block: -9 } },
+
+  // ---- HEROISCH (Rang A) · Sturmauge, Blutmondzinne, Wandelgang ----------
+  { id: 'helm_a1', slot: 'helm', name: 'Sturmhaube des Blitzträgers', rarity: 4, mat: 'basalt',
+    effects: { dmgCore: 24, dmgAusdauer: -10 } },
+  { id: 'kett_a1', slot: 'kette', name: 'Amulett des Zinnenwarts', rarity: 4, mat: 'knochen',
+    effects: { heal: 25, dmgKraft: -10 } },
+  { id: 'umha_a1', slot: 'umhang', name: 'Mantel des Schwellenwesens', rarity: 4, mat: 'schatten',
+    effects: { luck: 24, vit: -10 } },
+  { id: 'brus_a1', slot: 'brust', name: 'Harnisch des Torhüters', rarity: 4, mat: 'knochen',
+    effects: { block: 26, dmgAusdauer: -11 } },
+  { id: 'waff_a1', slot: 'waffe', name: 'Sturmstab des Hagelwerfers', rarity: 4, mat: 'basalt',
+    effects: { dmgKraft: 26, dmgTempo: -11 } },
+  { id: 'ring_a1', slot: 'ring', name: 'Reif des Rotpelzes', rarity: 4, mat: 'wolf',
+    effects: { dmgAll: 22, block: -11 } },
+  { id: 'hose_a1', slot: 'hose', name: 'Schrittgewand des Wandlers', rarity: 4, mat: 'schatten',
+    effects: { dmgAusdauer: 25, dmgCore: -10 } },
+  { id: 'schu_a1', slot: 'schuhe', name: 'Klauen der Wirbelbestie', rarity: 4, mat: 'wolf',
+    effects: { dmgTempo: 25, dmgKraft: -10 } },
+
+  // ---- MYSTISCH (Rang S) · Scherbenhimmel, Stille Wiege, Hohler Thron ----
+  { id: 'helm_s1', slot: 'helm', name: 'Krone des Nachtherrn', rarity: 5, mat: 'schatten',
+    effects: { dmgAll: 28, vit: -14 } },
+  { id: 'kett_s1', slot: 'kette', name: 'Kette des Kronvogts', rarity: 5, mat: 'basalt',
+    effects: { vit: 30, dmgTempo: -12 } },
+  { id: 'umha_s1', slot: 'umhang', name: 'Mantel der Summstille', rarity: 5, mat: 'schatten',
+    effects: { luck: 31, block: -13 } },
+  { id: 'brus_s1', slot: 'brust', name: 'Brustplatte der Himmelsscherbe', rarity: 5, mat: 'basalt',
+    effects: { block: 32, dmgAusdauer: -14 } },
+  { id: 'waff_s1', slot: 'waffe', name: 'Zepter des Kronlosen', rarity: 5, mat: 'knochen',
+    effects: { dmgKraft: 32, dmgCore: -14 } },
+  { id: 'ring_s1', slot: 'ring', name: 'Kometensiegel', rarity: 5, mat: 'wolf',
+    effects: { dmgCore: 30, dmgKraft: -12 } },
+  { id: 'hose_s1', slot: 'hose', name: 'Läufe der Kometenhunde', rarity: 5, mat: 'wolf',
+    effects: { dmgAusdauer: 30, dmgTempo: -12 } },
+  { id: 'schu_s1', slot: 'schuhe', name: 'Tritte des Thronwächters', rarity: 5, mat: 'knochen',
+    effects: { dmgTempo: 31, dmgKraft: -13 } },
 ]
 
 // Anzeigetexte für die UI
@@ -160,14 +216,28 @@ export function variantId(basisId, stufen) {
   return basisId
 }
 
+// Schlüssel, bei denen ein niedrigerer Wert besser ist
+export const NIEDRIGER_IST_BESSER = ['load']
+
+// Ob ein Effekt für den Spieler vorteilhaft ist – nicht das Vorzeichen
+// allein entscheidet: weniger Belastung je Aktion ist ein Vorteil.
+export function istVorteil(key, wert) {
+  return NIEDRIGER_IST_BESSER.includes(key) ? wert < 0 : wert > 0
+}
+
 function skaliere(effects, stufen) {
   if (stufen === 0) return { ...effects }
   const out = {}
   for (const [key, wert] of Object.entries(effects)) {
-    if (wert > 0) {
+    if (istVorteil(key, wert)) {
       // Vorteile wachsen mit jeder Stufe und schrumpfen darunter, bleiben
-      // aber spürbar: mindestens 1
-      out[key] = Math.max(1, Math.round(wert * Math.pow(AUFWERT_FAKTOR, stufen)))
+      // aber spürbar: mindestens 1. Das Vorzeichen bleibt erhalten, damit
+      // auch ein Vorteil mit negativem Wert – weniger Belastung – mitwächst.
+      const betrag = Math.max(
+        1,
+        Math.round(Math.abs(wert) * Math.pow(AUFWERT_FAKTOR, stufen)),
+      )
+      out[key] = wert < 0 ? -betrag : betrag
     } else {
       out[key] = wert // Nachteile skalieren nicht mit
     }
@@ -296,13 +366,15 @@ const ALTE_SLOTS = {
   holzschwert: 'waffe',
 }
 
-// Ersatz mit gleichem Slot und möglichst gleicher Rarität
+// Ersatz mit gleichem Slot und möglichst gleicher Rarität. Seit der Katalog
+// bis Mystisch reicht, gibt es für jede alte Stufe ein echtes Stück – die
+// frühere Deckelung auf Episch entfällt.
 function ersatzFuer(slot, rar) {
   const kandidaten = KATALOG.filter((k) => k.slot === slot)
   if (kandidaten.length === 0) return null
-  const treffer =
-    kandidaten.find((k) => k.rarity === Math.min(rar, 2)) ?? kandidaten[0]
-  const stufen = Math.max(0, Math.min(MAX_RARITAET, rar) - treffer.rarity)
+  const ziel = Math.max(0, Math.min(MAX_RARITAET, rar))
+  const treffer = kandidaten.find((k) => k.rarity === ziel) ?? kandidaten[0]
+  const stufen = Math.max(0, ziel - treffer.rarity)
   return variantId(treffer.id, stufen)
 }
 
@@ -357,15 +429,6 @@ export const SLOT_LABELS = {
   ring: 'RING',
   hose: 'HOSE',
   schuhe: 'SCHUHE',
-}
-
-// Schlüssel, bei denen ein niedrigerer Wert besser ist
-export const NIEDRIGER_IST_BESSER = ['load']
-
-// Ob ein Effekt für den Spieler vorteilhaft ist – nicht das Vorzeichen
-// allein entscheidet: weniger Belastung je Aktion ist ein Vorteil.
-export function istVorteil(key, wert) {
-  return NIEDRIGER_IST_BESSER.includes(key) ? wert < 0 : wert > 0
 }
 
 // Effekte als Liste, Vorteile zuerst

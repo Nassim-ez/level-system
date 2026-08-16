@@ -5,17 +5,19 @@ import { findDungeon } from './dungeons.js'
 export const CHANCE_GLUECK = 0.12
 export const CHANCE_MATERIAL = 0.03
 
-// Welche Materialsorte ein Dungeon bevorzugt – daraus ergibt sich der Loot-Pool
-const DUNGEON_MATERIAL = {
-  eisenhoehle: 'basalt',
-  knochengruft: 'knochen',
-  nebelwald: 'wolf',
+// Materialsorten, die in einem Dungeon überhaupt vorkommen – abgelesen an
+// seinen Türen, damit jeder Rang ohne eigene Tabelle mitzieht.
+function dungeonMaterialien(dungeonId) {
+  const dungeon = findDungeon(dungeonId)
+  if (!dungeon) return null
+  return new Set(dungeon.tueren.map((t) => t.material ?? 'basalt'))
 }
 
 // Passende Katalog-Items eines Dungeons; ohne Treffer der ganze Katalog
 export function lootPool(dungeonId) {
-  const mat = DUNGEON_MATERIAL[dungeonId]
-  const treffer = KATALOG.filter((k) => k.mat === mat || k.mat === 'schatten')
+  const sorten = dungeonMaterialien(dungeonId)
+  if (!sorten) return KATALOG
+  const treffer = KATALOG.filter((k) => sorten.has(k.mat))
   return treffer.length > 0 ? treffer : KATALOG
 }
 
@@ -25,11 +27,19 @@ function zufall(liste, rng) {
 
 // Materialsorte der Gegner, die im Dungeon vorkommen
 function materialAusDungeon(dungeonId, rng) {
-  const dungeon = findDungeon(dungeonId)
-  const sorten = dungeon
-    ? [...new Set(dungeon.tueren.map((t) => t.material ?? 'basalt'))]
-    : ['basalt']
-  return zufall(sorten, rng)
+  const sorten = dungeonMaterialien(dungeonId)
+  return zufall(sorten ? [...sorten] : ['basalt'], rng)
+}
+
+/**
+ * Wählt das Beutestück zur Ziel-Rarität.
+ * Seit es Stücke bis Mystisch gibt, fällt das echte Item des Rangs – nur
+ * wenn der Pool keines in dieser Rarität führt, wird wie früher ein
+ * niedrigeres Stück hochgestuft.
+ */
+function waehleEintrag(pool, rar, rng) {
+  const eigene = pool.filter((k) => k.rarity === rar)
+  return zufall(eigene.length > 0 ? eigene : pool, rng)
 }
 
 /**
@@ -55,7 +65,7 @@ export function zieheDrop(dungeonId, rank, rng = Math.random, effekte = {}) {
   // Nie mehr als eine Rarität über dem eigenen Rang
   const rar = glueck ? Math.min(MAX_RARITAET, basis + 1) : basis
 
-  const eintrag = zufall(pool, rng)
+  const eintrag = waehleEintrag(pool, rar, rng)
   // Aufwertungsstufen bis zur Ziel-Rarität, nie unter die Katalog-Rarität
   const stufen = Math.max(0, rar - eintrag.rarity)
   const itemId = variantId(eintrag.id, stufen)
